@@ -23,7 +23,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { CalendarView } from "@/components/calendar-view"
-import { getUpcomingEvents } from "@/lib/supabase-api"
+import { getUpcomingEvents, createEvent } from "@/lib/supabase-api"
 import { sampleEvents } from "@/lib/sample-data"
 import type { Event } from "@/lib/types"
 
@@ -33,6 +33,8 @@ export default function CalendarPage() {
   const [open, setOpen] = useState(false)
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
+  const [isCreating, setIsCreating] = useState(false)
+  const [eventType, setEventType] = useState<"entrainement" | "competition" | "sortie">("entrainement")
 
   // Fetch events from the database
   useEffect(() => {
@@ -62,13 +64,45 @@ export default function CalendarPage() {
   const competitions = events.filter((event) => event.type === "competition")
   const outings = events.filter((event) => event.type === "sortie")
 
-  const handleCreateEvent = (e: React.FormEvent) => {
+  const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault()
-    setOpen(false)
-    toast({
-      title: "Événement créé",
-      description: "L'événement a été créé avec succès.",
-    })
+    setIsCreating(true)
+    
+    try {
+      // Get form data
+      const form = e.target as HTMLFormElement
+      const title = (form.querySelector('#title') as HTMLInputElement).value
+      const date = (form.querySelector('#date') as HTMLInputElement).value
+      const time = (form.querySelector('#time') as HTMLInputElement).value
+      const duration = parseInt((form.querySelector('#duration') as HTMLInputElement).value)
+      const location = (form.querySelector('#location') as HTMLInputElement).value
+      const description = (form.querySelector('#description') as HTMLTextAreaElement).value
+      
+      // Format the date and time
+      const dateTime = new Date(`${date}T${time}`).toISOString()
+      
+      // Create the event
+      await createEvent(title, description, eventType, dateTime, duration, location)
+      
+      // Refresh the events list
+      const updatedEvents = await getUpcomingEvents(100, null)
+      setEvents(updatedEvents || [])
+      
+      setOpen(false)
+      toast({
+        title: "Événement créé",
+        description: "L'événement a été créé avec succès.",
+      })
+    } catch (error) {
+      console.error("Error creating event:", error)
+      toast({
+        title: "Erreur",
+        description: "Impossible de créer l'événement. Veuillez réessayer.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsCreating(false)
+    }
   }
 
   return (
@@ -114,7 +148,10 @@ export default function CalendarPage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="type">Type</Label>
-                    <Select defaultValue="entrainement">
+                    <Select 
+                      defaultValue="entrainement" 
+                      onValueChange={(value) => setEventType(value as "entrainement" | "competition" | "sortie")}
+                    >
                       <SelectTrigger id="type">
                         <SelectValue placeholder="Type d'événement" />
                       </SelectTrigger>
@@ -135,7 +172,9 @@ export default function CalendarPage() {
                   <Textarea id="description" placeholder="Description de l'événement" rows={3} required />
                 </div>
                 <DialogFooter>
-                  <Button type="submit">Créer l'événement</Button>
+                  <Button type="submit" disabled={isCreating}>
+                    {isCreating ? "Création en cours..." : "Créer l'événement"}
+                  </Button>
                 </DialogFooter>
               </form>
             </DialogContent>

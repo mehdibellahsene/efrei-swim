@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -21,19 +21,45 @@ import { Plus } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { useRole } from "@/components/role-provider"
 import { ArticlePreview } from "@/components/article-preview"
+import { createArticle } from "@/lib/supabase-api"
+import type { Article } from "@/lib/types"
 
 export default function ForumPage() {
   const { role } = useRole()
   const { toast } = useToast()
   const [open, setOpen] = useState(false)
+  const [articles, setArticles] = useState<Article[]>(sampleArticles)
+  const [isLoading, setIsLoading] = useState(false)
 
-  const handleCreateArticle = (e: React.FormEvent) => {
+  const handleCreateArticle = async (e: React.FormEvent) => {
     e.preventDefault()
-    setOpen(false)
-    toast({
-      title: "Article créé",
-      description: "L'article a été créé avec succès.",
-    })
+    setIsLoading(true)
+
+    // Get form data
+    const form = e.target as HTMLFormElement
+    const title = (form.querySelector('#title') as HTMLInputElement).value
+    const content = (form.querySelector('#content') as HTMLTextAreaElement).value
+    const coverImage = (form.querySelector('#coverImage') as HTMLInputElement).value || null
+    
+    try {
+      await createArticle(title, content, coverImage)
+      setOpen(false)
+      toast({
+        title: "Article créé",
+        description: "L'article a été créé avec succès.",
+      })
+      // Here you would reload the articles data
+      // For now, we'll just use the sample data
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: "Erreur",
+        description: "Impossible de créer l'article. Veuillez réessayer.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -71,7 +97,9 @@ export default function ForumPage() {
                   <Textarea id="content" placeholder="Contenu de l'article..." rows={10} required />
                 </div>
                 <DialogFooter>
-                  <Button type="submit">Publier l'article</Button>
+                  <Button type="submit" disabled={isLoading}>
+                    {isLoading ? "Publication en cours..." : "Publier l'article"}
+                  </Button>
                 </DialogFooter>
               </form>
             </DialogContent>
@@ -80,7 +108,7 @@ export default function ForumPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-8">
-        {sampleArticles.map((article) => (
+        {articles.map((article) => (
           <ArticlePreview key={article.id} article={article} />
         ))}
       </div>

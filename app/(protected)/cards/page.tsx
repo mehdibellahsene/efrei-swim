@@ -25,20 +25,44 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { createCard } from "@/lib/supabase-api"
 
 export default function CardsPage() {
   const { toast } = useToast()
   const [open, setOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [selectedCard, setSelectedCard] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
 
-  const handleCreateCard = (e: React.FormEvent) => {
+  const handleCreateCard = async (e: React.FormEvent) => {
     e.preventDefault()
-    setOpen(false)
-    toast({
-      title: "Carte créée",
-      description: "La carte a été créée avec succès.",
-    })
+    setIsLoading(true)
+    
+    // Get form data
+    const form = e.target as HTMLFormElement
+    const cardId = (form.querySelector('#cardId') as HTMLInputElement).value
+    const totalEntries = parseInt((form.querySelector('#totalEntries') as HTMLInputElement).value)
+    const purchasePrice = parseFloat((form.querySelector('#purchasePrice') as HTMLInputElement).value)
+    const notes = (form.querySelector('#notes') as HTMLTextAreaElement).value || null
+    
+    try {
+      await createCard(cardId, totalEntries, purchasePrice, notes)
+      setOpen(false)
+      toast({
+        title: "Carte créée",
+        description: "La carte a été créée avec succès.",
+      })
+      // Here you would reload the cards data
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: "Erreur",
+        description: "Impossible de créer la carte. Veuillez réessayer.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleEditCard = (e: React.FormEvent) => {
@@ -95,23 +119,13 @@ export default function CardsPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="status">Statut</Label>
-                <Select defaultValue="active">
-                  <SelectTrigger id="status">
-                    <SelectValue placeholder="Statut de la carte" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="notes">Notes</Label>
                 <Textarea id="notes" placeholder="Notes supplémentaires" rows={3} />
               </div>
               <DialogFooter>
-                <Button type="submit">Ajouter la carte</Button>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? "Création en cours..." : "Ajouter la carte"}
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>
