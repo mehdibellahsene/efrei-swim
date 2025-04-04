@@ -1,0 +1,164 @@
+"use client"
+
+import type React from "react"
+
+import { useState } from "react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
+import { sampleEvents } from "@/lib/sample-data"
+import { EventCard } from "@/components/event-card"
+import { useRole } from "@/components/role-provider"
+import { Plus } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useToast } from "@/hooks/use-toast"
+import { CalendarView } from "@/components/calendar-view"
+
+export default function CalendarPage() {
+  const { role } = useRole()
+  const { toast } = useToast()
+  const [open, setOpen] = useState(false)
+
+  // Filtrer les événements par type
+  const trainings = sampleEvents.filter((event) => event.type === "entrainement")
+  const competitions = sampleEvents.filter((event) => event.type === "competition")
+  const outings = sampleEvents.filter((event) => event.type === "sortie")
+
+  const handleCreateEvent = (e: React.FormEvent) => {
+    e.preventDefault()
+    setOpen(false)
+    toast({
+      title: "Événement créé",
+      description: "L'événement a été créé avec succès.",
+    })
+  }
+
+  return (
+    <div className="container py-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Calendrier</h1>
+          <p className="text-muted-foreground mt-1">Consultez et inscrivez-vous aux événements à venir</p>
+        </div>
+
+        {(role === "membre" || role === "admin") && (
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                Créer un événement
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[525px]">
+              <DialogHeader>
+                <DialogTitle>Créer un nouvel événement</DialogTitle>
+                <DialogDescription>Remplissez les informations pour créer un nouvel événement.</DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleCreateEvent} className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="title">Titre</Label>
+                  <Input id="title" placeholder="Titre de l'événement" required />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="date">Date</Label>
+                    <Input id="date" type="date" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="time">Heure</Label>
+                    <Input id="time" type="time" required />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="duration">Durée (minutes)</Label>
+                    <Input id="duration" type="number" min="15" step="15" defaultValue="60" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="type">Type</Label>
+                    <Select defaultValue="entrainement">
+                      <SelectTrigger id="type">
+                        <SelectValue placeholder="Type d'événement" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="entrainement">Entraînement</SelectItem>
+                        <SelectItem value="competition">Compétition</SelectItem>
+                        <SelectItem value="sortie">Sortie</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="location">Lieu</Label>
+                  <Input id="location" placeholder="Lieu de l'événement" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea id="description" placeholder="Description de l'événement" rows={3} required />
+                </div>
+                <DialogFooter>
+                  <Button type="submit">Créer l'événement</Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
+      </div>
+
+      <Tabs defaultValue="calendar" className="mt-6">
+        <TabsList>
+          <TabsTrigger value="calendar">Calendrier</TabsTrigger>
+          <TabsTrigger value="all">Tous</TabsTrigger>
+          <TabsTrigger value="trainings">Entraînements</TabsTrigger>
+          <TabsTrigger value="competitions">Compétitions</TabsTrigger>
+          <TabsTrigger value="outings">Sorties</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="calendar" className="mt-6">
+          <CalendarView events={sampleEvents} />
+        </TabsContent>
+
+        <TabsContent value="all" className="mt-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {sampleEvents.map((event) => (
+              <EventCard key={event.id} event={event} />
+            ))}
+          </div>
+        </TabsContent>
+        <TabsContent value="trainings" className="mt-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {trainings.map((event) => (
+              <EventCard key={event.id} event={event} />
+            ))}
+          </div>
+        </TabsContent>
+        <TabsContent value="competitions" className="mt-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {competitions.map((event) => (
+              <EventCard key={event.id} event={event} />
+            ))}
+          </div>
+        </TabsContent>
+        <TabsContent value="outings" className="mt-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {outings.map((event) => (
+              <EventCard key={event.id} event={event} />
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}
+
