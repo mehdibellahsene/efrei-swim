@@ -8,8 +8,9 @@ import type { Event } from "@/lib/types"
 import { useRole } from "@/components/role-provider"
 import { useToast } from "@/hooks/use-toast"
 import { Calendar, Clock, MapPin, Users } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { EventDetailModal } from "@/components/event-detail-modal"
+import { registerForEvent, unregisterFromEvent } from "@/lib/supabase-api"
 
 interface EventCardProps {
   event: Event
@@ -20,23 +21,50 @@ export function EventCard({ event }: EventCardProps) {
   const { toast } = useToast()
   const [isRegistered, setIsRegistered] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
-  const handleRegister = (e: React.MouseEvent) => {
+  const handleRegister = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    setIsRegistered(true)
-    toast({
-      title: "Inscription réussie",
-      description: `Vous êtes inscrit à l'événement "${event.title}"`,
-    })
+    setIsLoading(true)
+    try {
+      await registerForEvent(event.id)
+      setIsRegistered(true)
+      toast({
+        title: "Inscription réussie",
+        description: `Vous êtes inscrit à l'événement "${event.title}"`,
+      })
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de vous inscrire à cet événement. Veuillez réessayer.",
+        variant: "destructive",
+      })
+      console.error(error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const handleUnregister = (e: React.MouseEvent) => {
+  const handleUnregister = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    setIsRegistered(false)
-    toast({
-      title: "Désinscription réussie",
-      description: `Vous êtes désinscrit de l'événement "${event.title}"`,
-    })
+    setIsLoading(true)
+    try {
+      await unregisterFromEvent(event.id)
+      setIsRegistered(false)
+      toast({
+        title: "Désinscription réussie",
+        description: `Vous êtes désinscrit de l'événement "${event.title}"`,
+      })
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de vous désinscrire de cet événement. Veuillez réessayer.",
+        variant: "destructive",
+      })
+      console.error(error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const formatDate = (dateString: string) => {
@@ -132,12 +160,21 @@ export function EventCard({ event }: EventCardProps) {
         <CardFooter>
           {role !== "visiteur" &&
             (isRegistered ? (
-              <Button variant="outline" className="w-full" onClick={handleUnregister}>
-                Se désinscrire
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                onClick={handleUnregister}
+                disabled={isLoading}
+              >
+                {isLoading ? "Chargement..." : "Se désinscrire"}
               </Button>
             ) : (
-              <Button className="w-full" onClick={handleRegister}>
-                S'inscrire
+              <Button 
+                className="w-full" 
+                onClick={handleRegister}
+                disabled={isLoading}
+              >
+                {isLoading ? "Chargement..." : "S'inscrire"}
               </Button>
             ))}
         </CardFooter>

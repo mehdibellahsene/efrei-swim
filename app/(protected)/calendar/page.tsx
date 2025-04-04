@@ -2,10 +2,9 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { sampleEvents } from "@/lib/sample-data"
 import { EventCard } from "@/components/event-card"
 import { useRole } from "@/components/role-provider"
 import { Plus } from "lucide-react"
@@ -24,16 +23,44 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { CalendarView } from "@/components/calendar-view"
+import { getUpcomingEvents } from "@/lib/supabase-api"
+import { sampleEvents } from "@/lib/sample-data"
+import type { Event } from "@/lib/types"
 
 export default function CalendarPage() {
   const { role } = useRole()
   const { toast } = useToast()
   const [open, setOpen] = useState(false)
+  const [events, setEvents] = useState<Event[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Fetch events from the database
+  useEffect(() => {
+    async function fetchEvents() {
+      try {
+        const data = await getUpcomingEvents(100, null)
+        setEvents(data || [])
+      } catch (error) {
+        console.error("Error fetching events:", error)
+        // Fallback to sample data if there's an error
+        setEvents(sampleEvents)
+        toast({
+          title: "Erreur",
+          description: "Impossible de charger les événements. Affichage des données de test.",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchEvents()
+  }, [toast])
 
   // Filtrer les événements par type
-  const trainings = sampleEvents.filter((event) => event.type === "entrainement")
-  const competitions = sampleEvents.filter((event) => event.type === "competition")
-  const outings = sampleEvents.filter((event) => event.type === "sortie")
+  const trainings = events.filter((event) => event.type === "entrainement")
+  const competitions = events.filter((event) => event.type === "competition")
+  const outings = events.filter((event) => event.type === "sortie")
 
   const handleCreateEvent = (e: React.FormEvent) => {
     e.preventDefault()
@@ -125,38 +152,46 @@ export default function CalendarPage() {
           <TabsTrigger value="outings">Sorties</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="calendar" className="mt-6">
-          <CalendarView events={sampleEvents} />
-        </TabsContent>
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            <p>Chargement des événements...</p>
+          </div>
+        ) : (
+          <>
+            <TabsContent value="calendar" className="mt-6">
+              <CalendarView events={events} />
+            </TabsContent>
 
-        <TabsContent value="all" className="mt-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {sampleEvents.map((event) => (
-              <EventCard key={event.id} event={event} />
-            ))}
-          </div>
-        </TabsContent>
-        <TabsContent value="trainings" className="mt-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {trainings.map((event) => (
-              <EventCard key={event.id} event={event} />
-            ))}
-          </div>
-        </TabsContent>
-        <TabsContent value="competitions" className="mt-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {competitions.map((event) => (
-              <EventCard key={event.id} event={event} />
-            ))}
-          </div>
-        </TabsContent>
-        <TabsContent value="outings" className="mt-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {outings.map((event) => (
-              <EventCard key={event.id} event={event} />
-            ))}
-          </div>
-        </TabsContent>
+            <TabsContent value="all" className="mt-6">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {events.map((event) => (
+                  <EventCard key={event.id} event={event} />
+                ))}
+              </div>
+            </TabsContent>
+            <TabsContent value="trainings" className="mt-6">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {trainings.map((event) => (
+                  <EventCard key={event.id} event={event} />
+                ))}
+              </div>
+            </TabsContent>
+            <TabsContent value="competitions" className="mt-6">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {competitions.map((event) => (
+                  <EventCard key={event.id} event={event} />
+                ))}
+              </div>
+            </TabsContent>
+            <TabsContent value="outings" className="mt-6">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {outings.map((event) => (
+                  <EventCard key={event.id} event={event} />
+                ))}
+              </div>
+            </TabsContent>
+          </>
+        )}
       </Tabs>
     </div>
   )

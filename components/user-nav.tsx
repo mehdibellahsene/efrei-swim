@@ -1,3 +1,4 @@
+// components/user-nav.tsx
 "use client"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -12,32 +13,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useRole } from "@/components/role-provider"
-import { useRouter } from "next/navigation"
+import { useAuth } from "@/components/supabase-auth-provider"
 import { LogOut, User } from "lucide-react"
 
 export function UserNav() {
-  const { role, setRole } = useRole()
-  const router = useRouter()
-
-  const handleLogout = () => {
-    setRole("visiteur")
-    router.push("/")
-  }
-
-  // Determine user info based on role
-  let userName = "Utilisateur"
-  let userEmail = "utilisateur@efrei.net"
-
-  if (role === "admin") {
-    userName = "Admin"
-    userEmail = "admin@efrei.net"
-  } else if (role === "membre") {
-    userName = "Sophie Martin"
-    userEmail = "membre@efrei.net"
-  } else if (role === "athlete") {
-    userName = "Thomas Dubois"
-    userEmail = "athlete@efrei.net"
-  }
+  const { role } = useRole()
+  const { user, signOut } = useAuth()
+  
+  // Get user display name - prefer custom name, fall back to email
+  const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Utilisateur"
+  const userEmail = user?.email || "utilisateur@efrei.net"
 
   return (
     <DropdownMenu>
@@ -65,7 +50,7 @@ export function UserNav() {
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleLogout}>
+        <DropdownMenuItem onClick={signOut}>
           <LogOut className="mr-2 h-4 w-4" />
           <span>Déconnexion</span>
         </DropdownMenuItem>
@@ -73,4 +58,3 @@ export function UserNav() {
     </DropdownMenu>
   )
 }
-

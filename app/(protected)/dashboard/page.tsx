@@ -1,20 +1,48 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { useRole } from "@/components/role-provider"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { sampleEvents } from "@/lib/sample-data"
+import { sampleEvents, sampleArticles } from "@/lib/sample-data"
 import { Calendar, CreditCard, DollarSign, Users } from "lucide-react"
 import { EventCard } from "@/components/event-card"
-import { sampleArticles } from "@/lib/sample-data"
+import { getUpcomingEvents } from "@/lib/supabase-api"
+import type { Event } from "@/lib/types"
+import { useToast } from "@/hooks/use-toast"
 
 export default function DashboardPage() {
   const { role } = useRole()
+  const { toast } = useToast()
+  const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // Filtrer les événements à venir
-  const upcomingEvents = sampleEvents
-    .filter((event) => new Date(event.date) > new Date())
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .slice(0, 3)
+  // Fetch upcoming events
+  useEffect(() => {
+    async function fetchEvents() {
+      try {
+        const data = await getUpcomingEvents(3, null)
+        setUpcomingEvents(data || [])
+      } catch (error) {
+        console.error("Error fetching events:", error)
+        // Fallback to sample data if there's an error
+        const fallbackEvents = sampleEvents
+          .filter((event) => new Date(event.date) > new Date())
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+          .slice(0, 3)
+        
+        setUpcomingEvents(fallbackEvents)
+        toast({
+          title: "Erreur",
+          description: "Impossible de charger les événements. Affichage des données de test.",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchEvents()
+  }, [toast])
 
   return (
     <div className="container py-8">
@@ -73,11 +101,19 @@ export default function DashboardPage() {
             <CardDescription>Les prochains événements auxquels vous pouvez participer</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {upcomingEvents.map((event) => (
-                <EventCard key={event.id} event={event} />
-              ))}
-            </div>
+            {loading ? (
+              <div className="flex justify-center items-center h-32">
+                <p>Chargement des événements...</p>
+              </div>
+            ) : upcomingEvents.length > 0 ? (
+              <div className="space-y-4">
+                {upcomingEvents.map((event) => (
+                  <EventCard key={event.id} event={event} />
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground">Aucun événement à venir</p>
+            )}
           </CardContent>
         </Card>
 
