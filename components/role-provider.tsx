@@ -2,7 +2,6 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
-import { RoleSwitcher } from "@/components/role-switcher"
 
 type Role = "visiteur" | "athlete" | "membre" | "admin"
 
@@ -16,7 +15,7 @@ const RoleContext = createContext<RoleContextType | undefined>(undefined)
 export function RoleProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<Role>("visiteur")
 
-  // Persistance du rôle dans le localStorage
+  // Persistence of role in localStorage, but only for remembering between page loads
   useEffect(() => {
     const savedRole = localStorage.getItem("userRole") as Role
     if (savedRole) {
@@ -31,9 +30,6 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   return (
     <RoleContext.Provider value={{ role, setRole }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-50">
-        <RoleSwitcher />
-      </div>
     </RoleContext.Provider>
   )
 }

@@ -6,15 +6,12 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { supabase } from "@/lib/supabase"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
-  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -31,10 +28,13 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
-      const { error } = await supabase.auth.signInWithOtp({
+      // Use signInWithOtp with proper configuration
+      const { data, error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${window.location.origin}/dashboard`,
+          // Ensure callback URL is absolute
+          emailRedirectTo: window.location.origin + "/auth/callback",
+          shouldCreateUser: true, // Ensure user account is created if it doesn't exist
         },
       })
 
@@ -43,10 +43,11 @@ export default function LoginPage() {
       }
 
       toast({
-        title: "Magic Link envoyé",
+        title: "Lien magique envoyé",
         description: "Vérifiez votre boîte mail pour vous connecter.",
       })
     } catch (error: any) {
+      console.error("Login error:", error);
       toast({
         title: "Erreur",
         description: error.message || "Une erreur est survenue lors de l'envoi du lien de connexion.",
@@ -60,12 +61,11 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-md">
-        {/* Card content as in your original file */}
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
-            <Link href="/" className="flex items-center gap-2 font-bold text-xl">
+            <span className="flex items-center gap-2 font-bold text-xl">
               <span className="text-blue-600">EFREI</span> Swim
-            </Link>
+            </span>
           </div>
           <CardTitle className="text-2xl font-bold text-center">Connexion</CardTitle>
           <CardDescription className="text-center">
@@ -93,9 +93,9 @@ export default function LoginPage() {
         <CardFooter className="flex flex-col space-y-2">
           <div className="text-sm text-muted-foreground text-center">
             Pas encore de compte ?{" "}
-            <Link href="/auth/signup" className="text-blue-600 hover:underline">
+            <a href="/auth/signup" className="text-blue-600 hover:underline">
               Inscrivez-vous
-            </Link>
+            </a>
           </div>
         </CardFooter>
       </Card>

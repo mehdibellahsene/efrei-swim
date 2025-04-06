@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useEffect, useState } from "react"
+import React, { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { EventCard } from "@/components/event-card"
@@ -24,7 +22,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast"
 import { CalendarView } from "@/components/calendar-view"
 import { getUpcomingEvents, createEvent } from "@/lib/supabase-api"
-import { sampleEvents } from "@/lib/sample-data"
 import type { Event } from "@/lib/types"
 
 export default function CalendarPage() {
@@ -44,11 +41,9 @@ export default function CalendarPage() {
         setEvents(data || [])
       } catch (error) {
         console.error("Error fetching events:", error)
-        // Fallback to sample data if there's an error
-        setEvents(sampleEvents)
         toast({
           title: "Erreur",
-          description: "Impossible de charger les événements. Affichage des données de test.",
+          description: "Impossible de charger les événements. Veuillez réessayer.",
           variant: "destructive",
         })
       } finally {
@@ -59,7 +54,7 @@ export default function CalendarPage() {
     fetchEvents()
   }, [toast])
 
-  // Filtrer les événements par type
+  // Filter events by type
   const trainings = events.filter((event) => event.type === "entrainement")
   const competitions = events.filter((event) => event.type === "competition")
   const outings = events.filter((event) => event.type === "sortie")

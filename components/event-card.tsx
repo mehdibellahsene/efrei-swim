@@ -1,27 +1,36 @@
 "use client"
 
-import type React from "react"
-
+import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import type { Event } from "@/lib/types"
 import { useRole } from "@/components/role-provider"
 import { useToast } from "@/hooks/use-toast"
 import { Calendar, Clock, MapPin, Users } from "lucide-react"
-import { useEffect, useState } from "react"
 import { EventDetailModal } from "@/components/event-detail-modal"
 import { registerForEvent, unregisterFromEvent } from "@/lib/supabase-api"
+import { useAuth } from "@/components/supabase-auth-provider"
 
 interface EventCardProps {
   event: Event
+  onUpdate?: () => void
 }
 
-export function EventCard({ event }: EventCardProps) {
+export function EventCard({ event, onUpdate }: EventCardProps) {
   const { role } = useRole()
+  const { user } = useAuth()
   const { toast } = useToast()
   const [isRegistered, setIsRegistered] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  
+  // Check if user is registered for this event
+  useEffect(() => {
+    if (user && event.participants) {
+      const registered = event.participants.some(p => p.id === user.id)
+      setIsRegistered(registered)
+    }
+  }, [event.participants, user])
 
   const handleRegister = async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -33,6 +42,7 @@ export function EventCard({ event }: EventCardProps) {
         title: "Inscription réussie",
         description: `Vous êtes inscrit à l'événement "${event.title}"`,
       })
+      if (onUpdate) onUpdate()
     } catch (error) {
       toast({
         title: "Erreur",
@@ -55,6 +65,7 @@ export function EventCard({ event }: EventCardProps) {
         title: "Désinscription réussie",
         description: `Vous êtes désinscrit de l'événement "${event.title}"`,
       })
+      if (onUpdate) onUpdate()
     } catch (error) {
       toast({
         title: "Erreur",
@@ -67,6 +78,7 @@ export function EventCard({ event }: EventCardProps) {
     }
   }
 
+  // Format functions
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleDateString("fr-FR", {
@@ -86,19 +98,15 @@ export function EventCard({ event }: EventCardProps) {
   }
 
   const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60)
-    const mins = minutes % 60
-
-    if (hours === 0) {
-      return `${mins} min`
-    } else if (mins === 0) {
-      return `${hours} h`
-    } else {
-      return `${hours} h ${mins} min`
+    if (minutes < 60) {
+      return `${minutes} min`
     }
+    const hours = Math.floor(minutes / 60)
+    const remainingMinutes = minutes % 60
+    return remainingMinutes > 0 ? `${hours}h${remainingMinutes}` : `${hours}h`
   }
 
-  // Déterminer la couleur en fonction du type d'événement
+  // Determine the color based on the event type
   const getEventColor = () => {
     switch (event.type) {
       case "entrainement":
@@ -180,7 +188,12 @@ export function EventCard({ event }: EventCardProps) {
         </CardFooter>
       </Card>
 
-      <EventDetailModal event={event} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <EventDetailModal 
+        event={event} 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)}
+        onUpdate={onUpdate}
+      />
     </>
   )
 }

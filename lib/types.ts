@@ -21,8 +21,8 @@ export interface Attendance {
   id: string
   eventId: string
   userId: string
-  present: boolean
-  cardUsedId?: string
+  status: "registered" | "absent" | "attended"
+  absenceReason?: string
 }
 
 export interface Card {
@@ -33,6 +33,18 @@ export interface Card {
   status: "active" | "inactive"
   purchasePrice: number
   notes?: string
+  createdBy?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface CardUsage {
+  id: string
+  cardId: string
+  eventId?: string
+  entriesUsed: number
+  usedBy: string
+  usedAt: string
 }
 
 export interface Purchase {
@@ -40,17 +52,30 @@ export interface Purchase {
   amount: number
   label: string
   date: string
-  relatedCardId?: string
   category: string
+  relatedCardId?: string
+  relatedCardName?: string
+  createdBy?: string
+  createdAt?: string
 }
 
 export interface Article {
   id: string
-  authorId: string
-  author: User
   title: string
   content: string
-  coverImage: string
+  coverImage?: string
+  createdAt: string
+  authorId: string
+  author?: User
+  updatedAt?: string
+}
+
+export interface ActivityLog {
+  id: string
+  userId: string
+  userName?: string
+  action: string
+  details?: string
   createdAt: string
 }
 
