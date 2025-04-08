@@ -4,11 +4,15 @@ import { createContext, useContext, useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRole } from "@/components/role-provider"
 import { useRouter } from "next/navigation"
-import { User } from "@supabase/supabase-js"
+import { User, Session } from "@supabase/supabase-js"
+import { getUserProfile } from "@/lib/supabase-api"
 
 type AuthContextType = {
   user: User | null
+  session: Session | null
   isLoading: boolean
+  signIn: (email: string, password: string) => Promise<{ error?: string }>
+  signUp: (email: string, password: string, fullName: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
 }
 
@@ -16,103 +20,113 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function SupabaseAuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const { setRole } = useRole()
   const router = useRouter()
 
-  const signOut = async () => {
-    await supabase.auth.signOut()
-    setRole("visiteur")
-    router.push("/")
-  }
-
-  // Initial session fetch and profile setup
   useEffect(() => {
-    const fetchSession = async () => {
+    const initAuth = async () => {
+      setIsLoading(true)
       try {
-        const { data: { session } } = await supabase.auth.getSession()
-        
-        setUser(session?.user || null)
-        
-        if (session?.user) {
-          // Fetch user profile to get role
-          const { data: profile, error } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', session.user.id)
-            .single()
-          
-          if (profile) {
-            setRole(profile.role)
-          } else if (error) {
-            console.error("Error fetching profile:", error)
-            
-            // Try to create a profile if it doesn't exist
-            try {
-              const { error: createError } = await supabase.from('profiles').insert({
-                id: session.user.id,
-                full_name: session.user.user_metadata.full_name || 
-                           session.user.user_metadata.name || 
-                           session.user.email?.split('@')[0] || 
-                           'User',
-                role: 'visiteur'
-              })
-              
-              if (createError) throw createError
-              setRole('visiteur')
-            } catch (createErr) {
-              console.error("Failed to create profile:", createErr)
-              setRole('visiteur')
-            }
-          }
+        const {
+          data: { session: currentSession },
+        } = await supabase.auth.getSession()
+        setSession(currentSession)
+        setUser(currentSession?.user || null)
+
+        if (currentSession?.user) {
+          const profile = await getUserProfile(currentSession.user.id)
+          setRole(profile?.role || 'visiteur')
         } else {
-          setRole("visiteur")
+          setRole('visiteur')
         }
       } catch (error) {
-        console.error("Error in auth setup:", error)
-        setRole("visiteur")
+        console.error("Error initializing auth:", error)
       } finally {
         setIsLoading(false)
       }
     }
-    
-    fetchSession()
-  }, [setRole, router])
 
-  // Auth state change listener
-  useEffect(() => {
-    const { data: subscription } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setUser(session?.user || null)
-      
-      if (session?.user) {
-        try {
-          const { data: profile, error } = await supabase
-            .from("profiles")
-            .select("role")
-            .eq("id", session.user.id)
-            .single()
+    initAuth()
 
-          if (profile) {
-            setRole(profile.role)
-          } else {
-            setRole("visiteur")
-          }
-          
-          if (error) throw error
-        } catch (error) {
-          console.error("Error fetching profile on auth change:", error)
-          setRole("visiteur")
-        }
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+      setSession(newSession)
+      setUser(newSession?.user || null)
+      if (newSession?.user) {
+        const profile = await getUserProfile(newSession.user.id)
+        setRole(profile?.role || 'visiteur')
       } else {
-        setRole("visiteur")
+        setRole('visiteur')
       }
+      router.refresh()
     })
 
-    return () => subscription.unsubscribe()
-  }, [setRole])
+    return () => {
+      authListener?.subscription.unsubscribe()
+    }
+  }, [setRole, router])
+
+  const signIn = async (email: string, password: string) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) return { error: error.message }
+      if (data.user) {
+        const profile = await getUserProfile(data.user.id)
+        setRole(profile?.role || 'visiteur')
+      }
+      return {}
+    } catch (error: any) {
+      console.error("Error signing in:", error)
+      return { error: error.message || "Failed to sign in" }
+    }
+  }
+
+  const signUp = async (email: string, password: string, fullName: string) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { full_name: fullName } }
+      })
+      if (error) return { error: error.message }
+      if (data.user) {
+        // Optionally create a profile in your profiles table
+        const { error: profileError } = await supabase.from('profiles').insert([
+          { id: data.user.id, email, full_name: fullName, role: 'visiteur' }
+        ])
+        if (profileError) return { error: profileError.message }
+      }
+      return {}
+    } catch (error: any) {
+      console.error("Error signing up:", error)
+      return { error: error.message || "Failed to sign up" }
+    }
+  }
+
+  const signOut = async () => {
+    try {
+      await supabase.auth.signOut()
+      setUser(null)
+      setSession(null)
+      setRole('visiteur')
+      router.push('/auth/login')
+    } catch (error) {
+      console.error("Error signing out:", error)
+    }
+  }
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, signOut }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        isLoading,
+        signIn,
+        signUp,
+        signOut,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )

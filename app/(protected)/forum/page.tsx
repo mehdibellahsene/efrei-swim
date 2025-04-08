@@ -16,20 +16,45 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
-import { sampleArticles } from "@/lib/sample-data"
 import { Plus } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { useRole } from "@/components/role-provider"
 import { ArticlePreview } from "@/components/article-preview"
-import { createArticle } from "@/lib/supabase-api"
+import { createArticle, getAllArticles } from "@/lib/supabase-api"
 import type { Article } from "@/lib/types"
 
 export default function ForumPage() {
   const { role } = useRole()
   const { toast } = useToast()
   const [open, setOpen] = useState(false)
-  const [articles, setArticles] = useState<Article[]>(sampleArticles)
-  const [isLoading, setIsLoading] = useState(false)
+  const [articles, setArticles] = useState<Article[]>([]) // Initialize with empty array
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    fetchArticles()
+  }, [])
+
+  // Function to fetch articles from the database
+  const fetchArticles = async () => {
+    setIsLoading(true)
+    try {
+      const fetchedArticles = await getAllArticles(100)
+      console.log("Fetched articles:", fetchedArticles)
+      
+      if (fetchedArticles && fetchedArticles.length > 0) {
+        setArticles(fetchedArticles)
+      }
+    } catch (error) {
+      console.error("Error fetching articles:", error)
+      toast({
+        title: "Erreur",
+        description: "Impossible de récupérer les articles.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleCreateArticle = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -48,10 +73,12 @@ export default function ForumPage() {
         title: "Article créé",
         description: "L'article a été créé avec succès.",
       })
-      // Here you would reload the articles data
-      // For now, we'll just use the sample data
+      
+      // Fetch the updated list of articles after creating a new one
+      fetchArticles()
+      
     } catch (error) {
-      console.error(error)
+      console.error("handleCreateArticle error:", error)
       toast({
         title: "Erreur",
         description: "Impossible de créer l'article. Veuillez réessayer.",

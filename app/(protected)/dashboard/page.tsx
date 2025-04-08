@@ -3,143 +3,203 @@
 import { useEffect, useState } from "react"
 import { useRole } from "@/components/role-provider"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { sampleEvents, sampleArticles } from "@/lib/sample-data"
 import { Calendar, CreditCard, DollarSign, Users } from "lucide-react"
 import { EventCard } from "@/components/event-card"
-import { getUpcomingEvents } from "@/lib/supabase-api"
-import type { Event } from "@/lib/types"
+import { getUpcomingEvents, getAllPurchases, getAllCards, getAllUsers } from "@/lib/supabase-api"
+import type { Event, Purchase, Card as CardType, Profile } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 
 export default function DashboardPage() {
   const { role } = useRole()
   const { toast } = useToast()
-  const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([])
+  const [events, setEvents] = useState<Event[]>([])
+  const [purchases, setPurchases] = useState<Purchase[]>([])
+  const [cards, setCards] = useState<CardType[]>([])
+  const [users, setUsers] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Fetch upcoming events
   useEffect(() => {
-    async function fetchEvents() {
+    async function fetchData() {
+      setLoading(true)
+      
       try {
-        const data = await getUpcomingEvents(3, null)
-        setUpcomingEvents(data || [])
-      } catch (error) {
-        console.error("Error fetching events:", error)
-        // Fallback to sample data if there's an error
-        const fallbackEvents = sampleEvents
-          .filter((event) => new Date(event.date) > new Date())
-          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-          .slice(0, 3)
+        // Fetch all required data in parallel
+        const [eventsData, purchasesData, cardsData, usersData] = await Promise.all([
+          getUpcomingEvents(5), 
+          getAllPurchases(),
+          getAllCards(),
+          getAllUsers()
+        ]);
         
-        setUpcomingEvents(fallbackEvents)
+        setEvents(eventsData || []);
+        setPurchases(purchasesData || []);
+        setCards(cardsData || []);
+        setUsers(usersData || []);
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
         toast({
           title: "Erreur",
-          description: "Impossible de charger les événements. Affichage des données de test.",
+          description: "Impossible de charger les données du tableau de bord.",
           variant: "destructive",
-        })
+        });
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
     }
+    
+    fetchData();
+  }, [toast]);
 
-    fetchEvents()
-  }, [toast])
+  const totalBudget = purchases.reduce((acc, curr) => acc + Number(curr.amount), 0)
+  const activeCardCount = cards.filter(card => card.status === "active").length
+  const activeMemberCount = users.filter(user => user.role === "membre").length
+  const upcomingEventsCount = events.length
 
   return (
-    <div className="container py-8">
-      <div className="flex flex-col gap-4">
-        <h1 className="text-3xl font-bold">Tableau de bord</h1>
-        <p className="text-muted-foreground">Bienvenue sur votre tableau de bord EFREI Swim.</p>
+    <div className="flex-1 space-y-4 p-6 pt-6">
+      <div className="flex items-center justify-between space-y-2">
+        <h2 className="text-3xl font-bold tracking-tight">Tableau de bord</h2>
       </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Entraînements</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Événements à venir
+            </CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
-            <p className="text-xs text-muted-foreground">Entraînements ce mois-ci</p>
+            <div className="text-2xl font-bold">
+              {loading ? "..." : upcomingEventsCount}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Prochains événements programmés
+            </p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Participations</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">8</div>
-            <p className="text-xs text-muted-foreground">Vos participations ce mois-ci</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Entrées restantes</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">22</div>
-            <p className="text-xs text-muted-foreground">Sur toutes les cartes actives</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Budget</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">1 250 €</div>
-            <p className="text-xs text-muted-foreground">Budget restant pour l'année</p>
-          </CardContent>
-        </Card>
+        
+        {(role === "admin" || role === "membre") && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Budget (30 jours)
+              </CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {loading ? "..." : `${totalBudget.toFixed(2)} €`}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Dépenses des 30 derniers jours
+              </p>
+            </CardContent>
+          </Card>
+        )}
+        
+        {role === "admin" && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Cartes actives
+              </CardTitle>
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {loading ? "..." : activeCardCount}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Cartes avec des entrées restantes
+              </p>
+            </CardContent>
+          </Card>
+        )}
+        
+        {role === "admin" && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Membres actifs
+              </CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {loading ? "..." : activeMemberCount}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Utilisateurs avec rôle "membre"
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-8">
-        <Card className="col-span-2">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        <Card className="col-span-4">
           <CardHeader>
             <CardTitle>Événements à venir</CardTitle>
-            <CardDescription>Les prochains événements auxquels vous pouvez participer</CardDescription>
+            <CardDescription>
+              Les prochains événements programmés sur votre calendrier
+            </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pl-2">
             {loading ? (
-              <div className="flex justify-center items-center h-32">
-                <p>Chargement des événements...</p>
+              <div className="flex items-center justify-center h-[200px]">
+                Chargement...
               </div>
-            ) : upcomingEvents.length > 0 ? (
-              <div className="space-y-4">
-                {upcomingEvents.map((event) => (
+            ) : events.length > 0 ? (
+              <div className="space-y-8">
+                {events.map((event) => (
                   <EventCard key={event.id} event={event} />
                 ))}
               </div>
             ) : (
-              <p className="text-muted-foreground">Aucun événement à venir</p>
+              <div className="flex items-center justify-center h-[200px] text-muted-foreground">
+                Aucun événement à venir
+              </div>
             )}
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Derniers articles</CardTitle>
-            <CardDescription>Les dernières actualités du club</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {sampleArticles.slice(0, 2).map((article) => (
-                <div key={article.id} className="border-b pb-4 last:border-0">
-                  <h3 className="font-medium line-clamp-1">{article.title}</h3>
-                  <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{article.content}</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(article.createdAt).toLocaleDateString("fr-FR")}
-                    </span>
-                    <span className="text-xs">•</span>
-                    <span className="text-xs text-muted-foreground">{article.author.name}</span>
-                  </div>
+        
+        {(role === "admin" || role === "membre") && (
+          <Card className="col-span-3">
+            <CardHeader>
+              <CardTitle>Dernières dépenses</CardTitle>
+              <CardDescription>
+                Résumé des transactions récentes
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex items-center justify-center h-[200px]">
+                  Chargement...
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              ) : purchases.length > 0 ? (
+                <div className="space-y-4">
+                  {purchases.slice(0, 5).map((purchase) => (
+                    <div key={purchase.id} className="flex items-center">
+                      <div className="ml-4 space-y-1">
+                        <p className="text-sm font-medium leading-none">{purchase.label}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {new Date(purchase.date).toLocaleDateString('fr-FR')}
+                        </p>
+                      </div>
+                      <div className="ml-auto font-medium">
+                        {Number(purchase.amount).toFixed(2)} €
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-[200px] text-muted-foreground">
+                  Aucune dépense récente
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   )

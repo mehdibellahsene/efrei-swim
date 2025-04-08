@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,30 +18,90 @@ import {
 } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
-import { samplePurchases } from "@/lib/sample-data"
 import { DollarSign, Plus } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useRole } from "@/components/role-provider"
+import { createPurchase, getAllPurchases } from "@/lib/supabase-api"
+import type { Purchase } from "@/lib/types"
 
 export default function BudgetPage() {
   const { role } = useRole()
   const { toast } = useToast()
   const [open, setOpen] = useState(false)
+  const [purchases, setPurchases] = useState<Purchase[]>([])
+  const [selectedCategory, setSelectedCategory] = useState("autre")
+  const [isLoading, setIsLoading] = useState(true)
 
-  const handleCreatePurchase = (e: React.FormEvent) => {
+  // Fetch purchases when component loads
+  useEffect(() => {
+    fetchPurchases()
+  }, [])
+
+  const handleCreatePurchase = async (e: React.FormEvent) => {
     e.preventDefault()
-    setOpen(false)
-    toast({
-      title: "Dépense ajoutée",
-      description: "La dépense a été ajoutée avec succès.",
-    })
+
+    // Get the form element
+    const form = e.target as HTMLFormElement
+
+    try {
+      // Extract actual form values
+      const formData = {
+        label: (form.querySelector("#label") as HTMLInputElement).value,
+        amount: parseFloat((form.querySelector("#amount") as HTMLInputElement).value),
+        date: (form.querySelector("#date") as HTMLInputElement).value, // Keep as 'date' for frontend model
+        category: selectedCategory,
+        notes: "", // Optional field
+      }
+
+      // Validate form data
+      if (!formData.label || isNaN(formData.amount) || !formData.date || !formData.category) {
+        throw new Error("Please fill in all required fields")
+      }
+
+      await createPurchase(formData)
+      toast({
+        title: "Dépense ajoutée",
+        description: "La dépense a été ajoutée avec succès.",
+      })
+
+      // Refresh purchases (fetch updated data)
+      fetchPurchases()
+    } catch (error) {
+      console.error("Error adding purchase:", error)
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible d'ajouter la dépense.",
+        variant: "destructive",
+      })
+    } finally {
+      setOpen(false)
+    }
+  }
+
+  const fetchPurchases = async () => {
+    setIsLoading(true)
+    try {
+      // Use direct query method to get all purchases
+      const data = await getAllPurchases()
+      setPurchases(data || [])
+      console.log("Fetched purchases:", data)
+    } catch (error) {
+      console.error("Error fetching purchases:", error)
+      toast({
+        title: "Erreur",
+        description: "Impossible de récupérer les dépenses.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   // Calculer le total des dépenses
-  const totalExpenses = samplePurchases.reduce((total, purchase) => total + purchase.amount, 0)
+  const totalExpenses = purchases.reduce((total, purchase) => total + purchase.amount, 0)
 
   // Grouper les dépenses par catégorie
-  const expensesByCategory = samplePurchases.reduce(
+  const expensesByCategory = purchases.reduce(
     (acc, purchase) => {
       if (!acc[purchase.category]) {
         acc[purchase.category] = 0
@@ -90,7 +150,7 @@ export default function BudgetPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="category">Catégorie</Label>
-                  <Select>
+                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                     <SelectTrigger id="category">
                       <SelectValue placeholder="Sélectionner une catégorie" />
                     </SelectTrigger>
@@ -170,7 +230,7 @@ export default function BudgetPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {samplePurchases.map((purchase) => (
+              {purchases.map((purchase) => (
                 <TableRow key={purchase.id}>
                   <TableCell>{new Date(purchase.date).toLocaleDateString("fr-FR")}</TableCell>
                   <TableCell className="font-medium">{purchase.label}</TableCell>

@@ -4,11 +4,37 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useRole } from "@/components/role-provider"
-import { Calendar, CreditCard, DollarSign, LayoutDashboard, MessageSquare, Settings } from "lucide-react"
+import { Calendar, CreditCard, DollarSign, LayoutDashboard, MessageSquare, Settings, Users } from "lucide-react"
+import { useAuth } from "@/components/auth-provider"
+import { useToast } from "@/hooks/use-toast" 
+import { useRouter } from "next/navigation"
+import { supabase } from "@/lib/supabase"
 
 export function MainNav() {
   const pathname = usePathname()
   const { role } = useRole()
+  const { toast } = useToast()
+  const router = useRouter()
+
+  const handleSignOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+      
+      toast({
+        title: "Déconnexion réussie",
+        description: "Vous avez été déconnecté avec succès.",
+      })
+      
+      router.push("/")
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error.message || "Une erreur est survenue lors de la déconnexion.",
+        variant: "destructive",
+      })
+    }
+  }
 
   // Navigation items based on user role
   const navItems = [
@@ -43,9 +69,9 @@ export function MainNav() {
       roles: ["athlete", "membre", "admin"],
     },
     {
-      title: "Administration",
+      title: "Gestion Utilisateurs",
       href: "/admin",
-      icon: Settings,
+      icon: Users,
       roles: ["admin"],
     },
   ]

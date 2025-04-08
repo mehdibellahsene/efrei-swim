@@ -6,51 +6,46 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/lib/supabase"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/components/supabase-auth-provider"
+import Link from "next/link"
+import { Loader2 } from "lucide-react"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
+  const router = useRouter()
+  const { signIn } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    if (!email.endsWith("@efrei.net")) {
-      toast({
-        title: "Erreur",
-        description: "Seules les adresses email se terminant par @efrei.net sont autorisées.",
-        variant: "destructive",
-      })
-      return
-    }
-
     setIsLoading(true)
 
     try {
-      // Use signInWithOtp with proper configuration
-      const { data, error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          // Ensure callback URL is absolute
-          emailRedirectTo: window.location.origin + "/auth/callback",
-          shouldCreateUser: true, // Ensure user account is created if it doesn't exist
-        },
-      })
-
+      const { error } = await signIn(email, password)
+      
       if (error) {
-        throw error
+        toast({
+          title: "Erreur",
+          description: error,
+          variant: "destructive",
+        })
+        return
       }
-
+      
       toast({
-        title: "Lien magique envoyé",
-        description: "Vérifiez votre boîte mail pour vous connecter.",
+        title: "Connexion réussie",
+        description: "Vous êtes maintenant connecté.",
       })
+      
+      // Redirect to dashboard
+      router.push('/dashboard')
     } catch (error: any) {
-      console.error("Login error:", error);
       toast({
         title: "Erreur",
-        description: error.message || "Une erreur est survenue lors de l'envoi du lien de connexion.",
+        description: error.message || "Une erreur est survenue lors de la connexion",
         variant: "destructive",
       })
     } finally {
@@ -59,45 +54,62 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+    <div className="flex items-center justify-center min-h-screen bg-muted/40 p-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <div className="flex justify-center mb-4">
-            <span className="flex items-center gap-2 font-bold text-xl">
-              <span className="text-blue-600">EFREI</span> Swim
-            </span>
-          </div>
-          <CardTitle className="text-2xl font-bold text-center">Connexion</CardTitle>
-          <CardDescription className="text-center">
-            Entrez votre adresse email pour recevoir un lien de connexion
+        <CardHeader className="space-y-1 text-center">
+          <CardTitle className="text-2xl">Connexion</CardTitle>
+          <CardDescription>
+            Entrez votre email et mot de passe pour vous connecter
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit}>
+          <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="vous@efrei.net"
+              <Input 
+                id="email" 
+                type="email" 
+                placeholder="email@example.com" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
             </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Mot de passe</Label>
+                <Link href="/auth/reset-password" className="text-xs text-primary hover:underline">
+                  Mot de passe oublié ?
+                </Link>
+              </div>
+              <Input 
+                id="password" 
+                type="password" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+          </CardContent>
+          <CardFooter className="flex flex-col gap-2">
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Envoi en cours..." : "Envoyer le lien de connexion"}
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Connexion...
+                </>
+              ) : (
+                "Se connecter"
+              )}
             </Button>
-          </form>
-        </CardContent>
-        <CardFooter className="flex flex-col space-y-2">
-          <div className="text-sm text-muted-foreground text-center">
-            Pas encore de compte ?{" "}
-            <a href="/auth/signup" className="text-blue-600 hover:underline">
-              Inscrivez-vous
-            </a>
-          </div>
-        </CardFooter>
+            <div className="text-center text-sm mt-2">
+              Vous n&apos;avez pas de compte ?{" "}
+              <Link href="/auth/signup" className="text-primary hover:underline">
+                S&apos;inscrire
+              </Link>
+            </div>
+          </CardFooter>
+        </form>
       </Card>
     </div>
   )

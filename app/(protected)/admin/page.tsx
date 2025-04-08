@@ -1,65 +1,113 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
-import { sampleUsers } from "@/lib/sample-data"
-import { Badge } from "@/components/ui/badge"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { MoreHorizontal, Shield, Trash, UserCheck, UserMinus } from "lucide-react"
-import { useState } from "react"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { getAllUsers, updateUserRole, syncUserProfiles } from "@/lib/supabase-api"
+import { seedInitialData } from "@/lib/seed-data"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import type { Profile } from "@/lib/types"
 
 export default function AdminPage() {
   const { toast } = useToast()
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [selectedUser, setSelectedUser] = useState<string | null>(null)
+  const [users, setUsers] = useState<Profile[]>([])
+  const [loading, setLoading] = useState(true)
+  const [isSeedingData, setIsSeedingData] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
 
-  const handlePromoteUser = (userId: string, newRole: "athlete" | "membre" | "admin") => {
-    toast({
-      title: "Utilisateur promu",
-      description: `L'utilisateur a été promu au rôle de ${newRole}.`,
-    })
+  useEffect(() => {
+    fetchUsers()
+  }, [])
+
+  const fetchUsers = async () => {
+    setLoading(true)
+    try {
+      const data = await getAllUsers()
+      setUsers(data || [])
+    } catch (error) {
+      console.error("Error fetching users:", error)
+      toast({
+        title: "Erreur",
+        description: "Impossible de récupérer la liste des utilisateurs.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleDemoteUser = (userId: string) => {
-    toast({
-      title: "Utilisateur rétrogradé",
-      description: "L'utilisateur a été rétrogradé au rôle d'athlète.",
-    })
+  const handleSyncProfiles = async () => {
+    setIsSyncing(true)
+    try {
+      const success = await syncUserProfiles()
+      if (success) {
+        toast({
+          title: "Synchronisation réussie",
+          description: "Les profils utilisateurs ont été synchronisés avec succès.",
+        })
+        // Refresh the user list
+        await fetchUsers()
+      } else {
+        throw new Error("La synchronisation a échoué")
+      }
+    } catch (error) {
+      console.error("Error syncing profiles:", error)
+      toast({
+        title: "Erreur",
+        description: "Impossible de synchroniser les profils utilisateurs.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSyncing(false)
+    }
   }
 
-  const handleDeleteUser = () => {
-    setDeleteDialogOpen(false)
-    toast({
-      title: "Utilisateur supprimé",
-      description: "L'utilisateur a été supprimé avec succès.",
-    })
+  const handleSeedData = async () => {
+    setIsSeedingData(true)
+    try {
+      await seedInitialData()
+      toast({
+        title: "Initialisation réussie",
+        description: "Les données initiales ont été ajoutées avec succès.",
+      })
+      // Refresh the user list
+      await fetchUsers()
+    } catch (error) {
+      console.error("Error seeding data:", error)
+      toast({
+        title: "Erreur",
+        description: "Impossible d'initialiser les données.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSeedingData(false)
+    }
   }
 
   return (
     <div className="container py-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Administration</h1>
-          <p className="text-muted-foreground mt-1">Gérez les utilisateurs et les rôles</p>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-3xl font-bold">Administration</h1>
+        <div className="space-x-2">
+          <Button 
+            onClick={handleSyncProfiles} 
+            disabled={isSyncing} 
+            variant="outline"
+          >
+            {isSyncing ? "Synchronisation..." : "Synchroniser les profils"}
+          </Button>
+          <Button 
+            onClick={handleSeedData} 
+            disabled={isSeedingData}
+            variant="secondary"
+          >
+            {isSeedingData ? "Initialisation..." : "Initialiser les données"}
+          </Button>
         </div>
       </div>
 
@@ -85,69 +133,15 @@ export default function AdminPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sampleUsers.map((user) => (
+                  {users.map((user) => (
                     <TableRow key={user.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={user.avatar} alt={user.name} />
-                            <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium">{user.name}</span>
-                        </div>
-                      </TableCell>
+                      <TableCell>{user.name}</TableCell>
                       <TableCell>{user.email}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            user.role === "admin" ? "destructive" : user.role === "membre" ? "default" : "secondary"
-                          }
-                        >
-                          {user.role}
-                        </Badge>
-                      </TableCell>
+                      <TableCell>{user.role}</TableCell>
                       <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">Actions</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            {user.role !== "admin" && (
-                              <DropdownMenuItem onClick={() => handlePromoteUser(user.id, "admin")}>
-                                <Shield className="h-4 w-4 mr-2" />
-                                Promouvoir en admin
-                              </DropdownMenuItem>
-                            )}
-                            {user.role !== "membre" && user.role !== "admin" && (
-                              <DropdownMenuItem onClick={() => handlePromoteUser(user.id, "membre")}>
-                                <UserCheck className="h-4 w-4 mr-2" />
-                                Promouvoir en membre
-                              </DropdownMenuItem>
-                            )}
-                            {(user.role === "membre" || user.role === "admin") && (
-                              <DropdownMenuItem onClick={() => handleDemoteUser(user.id)}>
-                                <UserMinus className="h-4 w-4 mr-2" />
-                                Rétrograder en athlète
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-red-600"
-                              onClick={() => {
-                                setSelectedUser(user.id)
-                                setDeleteDialogOpen(true)
-                              }}
-                            >
-                              <Trash className="h-4 w-4 mr-2" />
-                              Supprimer
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <Button variant="outline" onClick={() => updateUserRole(user.id, "admin")}>
+                          Promouvoir
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -209,25 +203,6 @@ export default function AdminPage() {
           </Card>
         </TabsContent>
       </Tabs>
-
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Supprimer l'utilisateur</DialogTitle>
-            <DialogDescription>
-              Êtes-vous sûr de vouloir supprimer cet utilisateur ? Cette action est irréversible.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
-              Annuler
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteUser}>
-              Supprimer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

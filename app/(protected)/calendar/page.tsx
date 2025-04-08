@@ -37,7 +37,8 @@ export default function CalendarPage() {
   useEffect(() => {
     async function fetchEvents() {
       try {
-        const data = await getUpcomingEvents(100, null)
+        setLoading(true)
+        const data = await getUpcomingEvents(100)
         setEvents(data || [])
       } catch (error) {
         console.error("Error fetching events:", error)

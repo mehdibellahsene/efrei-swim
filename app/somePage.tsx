@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
+import Link from "next/link"
 
 export default function AuthCallbackPage() {
   const router = useRouter()
@@ -17,11 +18,12 @@ export default function AuthCallbackPage() {
     const handleAuthCallback = async () => {
       try {
         // Get the URL hash and search params
+        const hash = window.location.hash
         const searchParams = new URLSearchParams(window.location.search)
-
+        
         console.log("Handling auth callback...");
         console.log("URL params:", window.location.search);
-
+        
         // Only throw error if there is an error AND no auth code
         if (searchParams.get('error') && !searchParams.get('code')) {
           const errorDescription = searchParams.get('error_description') || 'Unknown error';
@@ -31,15 +33,15 @@ export default function AuthCallbackPage() {
           }
           throw new Error(`Auth redirect error: ${errorDescription}`);
         }
-
+        
         // Get current session
         const { data: initialSessionData, error: sessionError } = await supabase.auth.getSession();
-
+        
         if (sessionError) {
           console.error("Session error:", sessionError);
           throw sessionError;
         }
-
+        
         // Check if we already have a valid session
         if (initialSessionData.session) {
           console.log("Active session found, proceeding to dashboard");
@@ -50,9 +52,9 @@ export default function AuthCallbackPage() {
           router.push("/dashboard");
           return;
         }
-
+        
         console.log("No active session found, checking for auth code...");
-
+        
         // Try to exchange auth code if present in URL
         const code = searchParams.get('code');
         if (!code) {
@@ -60,50 +62,46 @@ export default function AuthCallbackPage() {
           setDebugInfo(`URL: ${window.location.href}, Params: ${JSON.stringify(Object.fromEntries(searchParams))}`);
           throw new Error("Aucun code d'authentification trouvé dans l'URL. Veuillez réessayer de vous connecter.");
         }
-
+        
         // Explicitly exchange the auth code for a session
         console.log("Exchanging auth code for session...");
-        const { data: exchangeData, error: exchangeError } =
+        const { data: exchangeData, error: exchangeError } = 
           await supabase.auth.exchangeCodeForSession(code);
-
+        
         if (exchangeError) {
           console.error("Code exchange error:", exchangeError);
           setDebugInfo(`Code: ${code.substring(0, 5)}***`);
           throw new Error(`Erreur lors de l'échange du code: ${exchangeError.message}`);
         }
-
+        
         if (!exchangeData?.session) {
           console.error("No session returned from code exchange");
           setDebugInfo(`Exchange response: ${JSON.stringify(exchangeData)}`);
           throw new Error("Échec de création de session après échange de code. Réponse vide du serveur.");
         }
-
+        
         console.log("Auth code exchanged successfully, verifying session...");
-
-        // Explicitly set the session so that a cookie is written
-        const { error: setSessionError } = await supabase.auth.setSession({
-          access_token: exchangeData.session.access_token,
-          refresh_token: exchangeData.session.refresh_token,
-        });
-
-        if (setSessionError) {
-          console.error("Error setting session:", setSessionError);
-          throw new Error(`Erreur lors de la persistance de session: ${setSessionError.message}`);
+        
+        // Verify the session was created
+        const { data: verifyData } = await supabase.auth.getSession();
+        
+        if (!verifyData.session) {
+          console.error("Session verification failed - no session found after exchange");
+          // Try to debug what's happening with local storage
+          let storageDebug = "Storage inaccessible";
+          try {
+            const storageKeys = Object.keys(localStorage).filter(key => 
+              key.includes('supabase') || key.includes('auth'));
+            storageDebug = `Available storage keys: ${storageKeys.join(', ')}`;
+          } catch (e) {
+            storageDebug = `Storage error: ${e instanceof Error ? e.message : 'unknown'}`;
+          }
+          
+          setDebugInfo(storageDebug);
+          throw new Error("Session créée mais non persistée. Problème possible avec les cookies ou le stockage local.");
         }
-
-        console.log("Authentication successful, session verified and persisted!");
-
-        // Get the user data to check role
-        const { data: { user } } = await supabase.auth.getUser();
-
-        // Determine the correct redirect path based on user role
-        let redirectPath = "/dashboard"; // Default path for all users
-
-        // Check if user is an admin and set the redirect path
-        if (user && (user.user_metadata?.role === 'admin' || user.email?.includes('@admin'))) {
-          console.log("Admin user detected, redirecting to admin dashboard");
-          redirectPath = "/admin/dashboard"; // Redirect admins to admin dashboard
-        }
+        
+        console.log("Authentication successful, session verified!");
 
         // Authentication successful
         toast({
@@ -111,14 +109,14 @@ export default function AuthCallbackPage() {
           description: "Vous êtes maintenant connecté.",
         })
 
-        // Redirect to appropriate dashboard after successful authentication
-        router.push(redirectPath);
+        // Redirect to dashboard after successful authentication
+        router.push("/dashboard")
       } catch (error: any) {
         console.error("Authentication error:", error);
-
+        
         // Create a more informative error message
         let errorMessage = error.message || "Une erreur est survenue lors de la connexion.";
-
+        
         // Add some browser environment information for debugging
         const browserInfo = {
           userAgent: navigator.userAgent,
@@ -126,26 +124,26 @@ export default function AuthCallbackPage() {
           localStorage: typeof localStorage !== 'undefined',
           protocol: window.location.protocol,
         };
-
+        
         console.log("Browser environment:", browserInfo);
-
+        
         // Check if there's a specific issue with cookies
         if (
-          !navigator.cookieEnabled ||
-          error.message?.includes('cookie') ||
+          !navigator.cookieEnabled || 
+          error.message?.includes('cookie') || 
           error.message?.includes('storage')
         ) {
           errorMessage = "Échec d'authentification: veuillez activer les cookies et le stockage local dans votre navigateur.";
         }
-
+        
         setError(errorMessage);
-
+        
         toast({
           title: "Erreur d'authentification",
           description: errorMessage,
           variant: "destructive",
         })
-
+        
         // Redirect to login page after a delay if there's an error
         setTimeout(() => {
           router.push("/auth/login");
@@ -183,6 +181,7 @@ export default function AuthCallbackPage() {
           <div className="flex flex-col items-center gap-2">
             <p>Authentification réussie!</p>
             <p>Redirection vers le tableau de bord...</p>
+            <Link href="/admin/login">Admin Login</Link>
           </div>
         )}
       </div>

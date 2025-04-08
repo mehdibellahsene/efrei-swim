@@ -1,8 +1,7 @@
-// components/user-nav.tsx
 "use client"
 
+import { useAuth } from "@/components/auth-provider"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,22 +12,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useRole } from "@/components/role-provider"
-import { useAuth } from "@/components/auth-provider"
-import { LogOut, User, Settings } from "lucide-react"
+import { LogOut, Settings, User } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
+import { useToast } from "@/hooks/use-toast"
 
-export function UserNav() {
-  const { role } = useRole()
+export function UserAvatarMenu() {
   const { user } = useAuth()
+  const { role } = useRole()
   const router = useRouter()
   const { toast } = useToast()
-  
-  // Get user display name - prefer custom name, fall back to email
-  const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Utilisateur"
-  const userEmail = user?.email || "utilisateur@efrei.net"
 
   const handleSignOut = async () => {
     try {
@@ -50,19 +44,23 @@ export function UserNav() {
     }
   }
 
+  if (!user) return null
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Avatar className="h-8 w-8 cursor-pointer">
-          <AvatarImage src={user?.user_metadata?.avatar_url || "/placeholder.svg"} alt={userName} />
-          <AvatarFallback>{userName.charAt(0)}</AvatarFallback>
+          <AvatarImage src={user.user_metadata?.avatar_url || "/placeholder.svg"} alt={user.user_metadata?.full_name || "Utilisateur"} />
+          <AvatarFallback>
+            {user.user_metadata?.full_name ? user.user_metadata.full_name.charAt(0) : "U"}
+          </AvatarFallback>
         </Avatar>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{userName}</p>
-            <p className="text-xs leading-none text-muted-foreground">{userEmail}</p>
+            <p className="text-sm font-medium leading-none">{user.user_metadata?.full_name || "Utilisateur"}</p>
+            <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -74,7 +72,7 @@ export function UserNav() {
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link href="/parametre" className="flex w-full cursor-pointer items-center">
+            <Link href="/settings" className="flex w-full cursor-pointer items-center">
               <Settings className="mr-2 h-4 w-4" />
               <span>Paramètres</span>
             </Link>

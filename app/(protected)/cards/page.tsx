@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,13 +19,12 @@ import {
 } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
-import { sampleCards } from "@/lib/sample-data"
+import { getAllCards, createCard } from "@/lib/supabase-api"
 import { Edit, Plus, Trash } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { createCard } from "@/lib/supabase-api"
 
 export default function CardsPage() {
   const { toast } = useToast()
@@ -33,18 +32,41 @@ export default function CardsPage() {
   const [editOpen, setEditOpen] = useState(false)
   const [selectedCard, setSelectedCard] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [cards, setCards] = useState<any[]>([])
+  const [isLoadingCards, setIsLoadingCards] = useState(true)
+
+  const fetchCards = async () => {
+    setIsLoadingCards(true)
+    try {
+      const data = await getAllCards(100)
+      setCards(data || [])
+    } catch (error) {
+      console.error("Error fetching cards:", error)
+      toast({
+        title: "Erreur",
+        description: "Impossible de charger les cartes. Veuillez réessayer.",
+        variant: "destructive",
+      })
+      setCards([])
+    } finally {
+      setIsLoadingCards(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchCards()
+  }, [])
 
   const handleCreateCard = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    
-    // Get form data
+
     const form = e.target as HTMLFormElement
     const cardId = (form.querySelector('#cardId') as HTMLInputElement).value
     const totalEntries = parseInt((form.querySelector('#totalEntries') as HTMLInputElement).value)
     const purchasePrice = parseFloat((form.querySelector('#purchasePrice') as HTMLInputElement).value)
     const notes = (form.querySelector('#notes') as HTMLTextAreaElement).value || null
-    
+
     try {
       await createCard(cardId, totalEntries, purchasePrice, notes)
       setOpen(false)
@@ -52,7 +74,7 @@ export default function CardsPage() {
         title: "Carte créée",
         description: "La carte a été créée avec succès.",
       })
-      // Here you would reload the cards data
+      fetchCards()
     } catch (error) {
       console.error(error)
       toast({
@@ -194,66 +216,78 @@ export default function CardsPage() {
               <CardDescription>Liste des cartes d'entrées actuellement actives</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Entrées</TableHead>
-                    <TableHead>Statut</TableHead>
-                    <TableHead>Prix d'achat</TableHead>
-                    <TableHead>Notes</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sampleCards
-                    .filter((card) => card.status === "active")
-                    .map((card) => (
-                      <TableRow key={card.id}>
-                        <TableCell className="font-medium">{card.cardId}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-col gap-1">
-                            <div className="flex justify-between text-sm">
-                              <span>
-                                {card.remainingEntries} / {card.totalEntries}
-                              </span>
-                              <span className="text-muted-foreground">
-                                {Math.round((card.remainingEntries / card.totalEntries) * 100)}%
-                              </span>
-                            </div>
-                            <Progress value={(card.remainingEntries / card.totalEntries) * 100} />
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={card.status === "active" ? "default" : "secondary"}>
-                            {card.status === "active" ? "Active" : "Inactive"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{card.purchasePrice.toFixed(2)} €</TableCell>
-                        <TableCell className="max-w-[200px] truncate">{card.notes}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                setSelectedCard(card.id)
-                                setEditOpen(true)
-                              }}
-                            >
-                              <Edit className="h-4 w-4" />
-                              <span className="sr-only">Modifier</span>
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteCard(card.id)}>
-                              <Trash className="h-4 w-4" />
-                              <span className="sr-only">Supprimer</span>
-                            </Button>
-                          </div>
+              {isLoadingCards ? (
+                <div className="py-8 text-center">Chargement des cartes...</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ID</TableHead>
+                      <TableHead>Entrées</TableHead>
+                      <TableHead>Statut</TableHead>
+                      <TableHead>Prix d'achat</TableHead>
+                      <TableHead>Notes</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {cards.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-6">
+                          Aucune carte trouvée. Créez votre première carte !
                         </TableCell>
                       </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
+                    ) : (
+                      cards
+                        .filter((card) => card.status === "active")
+                        .map((card) => (
+                          <TableRow key={card.id}>
+                            <TableCell className="font-medium">{card.card_id || card.cardId}</TableCell>
+                            <TableCell>
+                              <div className="flex flex-col gap-1">
+                                <div className="flex justify-between text-sm">
+                                  <span>
+                                    {card.remaining_entries || card.remainingEntries} / {card.total_entries || card.totalEntries}
+                                  </span>
+                                  <span className="text-muted-foreground">
+                                    {Math.round(((card.remaining_entries || card.remainingEntries) / (card.total_entries || card.totalEntries)) * 100)}%
+                                  </span>
+                                </div>
+                                <Progress value={((card.remaining_entries || card.remainingEntries) / (card.total_entries || card.totalEntries)) * 100} />
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={card.status === "active" ? "default" : "secondary"}>
+                                {card.status === "active" ? "Active" : "Inactive"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{(card.purchase_price || card.purchasePrice).toFixed(2)} €</TableCell>
+                            <TableCell className="max-w-[200px] truncate">{card.notes}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => {
+                                    setSelectedCard(card.id)
+                                    setEditOpen(true)
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                  <span className="sr-only">Modifier</span>
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => handleDeleteCard(card.id)}>
+                                  <Trash className="h-4 w-4" />
+                                  <span className="sr-only">Supprimer</span>
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                    )}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -264,64 +298,76 @@ export default function CardsPage() {
               <CardDescription>Liste complète de toutes les cartes d'entrées</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Entrées</TableHead>
-                    <TableHead>Statut</TableHead>
-                    <TableHead>Prix d'achat</TableHead>
-                    <TableHead>Notes</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sampleCards.map((card) => (
-                    <TableRow key={card.id}>
-                      <TableCell className="font-medium">{card.cardId}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1">
-                          <div className="flex justify-between text-sm">
-                            <span>
-                              {card.remainingEntries} / {card.totalEntries}
-                            </span>
-                            <span className="text-muted-foreground">
-                              {Math.round((card.remainingEntries / card.totalEntries) * 100)}%
-                            </span>
-                          </div>
-                          <Progress value={(card.remainingEntries / card.totalEntries) * 100} />
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={card.status === "active" ? "default" : "secondary"}>
-                          {card.status === "active" ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{card.purchasePrice.toFixed(2)} €</TableCell>
-                      <TableCell className="max-w-[200px] truncate">{card.notes}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setSelectedCard(card.id)
-                              setEditOpen(true)
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                            <span className="sr-only">Modifier</span>
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDeleteCard(card.id)}>
-                            <Trash className="h-4 w-4" />
-                            <span className="sr-only">Supprimer</span>
-                          </Button>
-                        </div>
-                      </TableCell>
+              {isLoadingCards ? (
+                <div className="py-8 text-center">Chargement des cartes...</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ID</TableHead>
+                      <TableHead>Entrées</TableHead>
+                      <TableHead>Statut</TableHead>
+                      <TableHead>Prix d'achat</TableHead>
+                      <TableHead>Notes</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {cards.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-6">
+                          Aucune carte trouvée. Créez votre première carte !
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      cards.map((card) => (
+                        <TableRow key={card.id}>
+                          <TableCell className="font-medium">{card.card_id || card.cardId}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex justify-between text-sm">
+                                <span>
+                                  {card.remaining_entries || card.remainingEntries} / {card.total_entries || card.totalEntries}
+                                </span>
+                                <span className="text-muted-foreground">
+                                  {Math.round(((card.remaining_entries || card.remainingEntries) / (card.total_entries || card.totalEntries)) * 100)}%
+                                </span>
+                              </div>
+                              <Progress value={((card.remaining_entries || card.remainingEntries) / (card.total_entries || card.totalEntries)) * 100} />
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={card.status === "active" ? "default" : "secondary"}>
+                              {card.status === "active" ? "Active" : "Inactive"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{(card.purchase_price || card.purchasePrice).toFixed(2)} €</TableCell>
+                          <TableCell className="max-w-[200px] truncate">{card.notes}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setSelectedCard(card.id)
+                                  setEditOpen(true)
+                                }}
+                              >
+                                <Edit className="h-4 w-4" />
+                                <span className="sr-only">Modifier</span>
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => handleDeleteCard(card.id)}>
+                                <Trash className="h-4 w-4" />
+                                <span className="sr-only">Supprimer</span>
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
