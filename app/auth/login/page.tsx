@@ -22,11 +22,17 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
-      // Send magic link instead of password login
+      // Ensure we have the full origin for the redirect URL
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const redirectTo = `${origin}/auth/callback`;
+      
+      console.log("Sending magic link with redirect to:", redirectTo);
+      
+      // Send magic link with explicit redirect
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: redirectTo,
         }
       });
       

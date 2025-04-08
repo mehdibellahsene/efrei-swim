@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
+import { checkAuthConfig } from "@/lib/auth-utils"
 
 export default function AuthCallbackPage() {
   const router = useRouter()
@@ -16,53 +17,57 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        // Get the URL hash and search params
-        const searchParams = new URLSearchParams(window.location.search)
+        // Add diagnostic check
+        const authConfig = await checkAuthConfig();
+        console.log("Auth configuration:", authConfig);
+        setDebugInfo("Auth Config: " + JSON.stringify(authConfig, null, 2));
 
         console.log("Handling auth callback...");
-        console.log("URL params:", window.location.search);
-
-        // Only throw error if there is an error AND no auth code
-        if (searchParams.get('error') && !searchParams.get('code')) {
-          const errorDescription = searchParams.get('error_description') || 'Unknown error';
-          // Custom error message for expired/invalid email link
+        console.log("Full URL:", window.location.href);
+        
+        // Get both search params and hash fragments (Supabase sometimes uses hash fragments)
+        const searchParams = new URLSearchParams(window.location.search);
+        const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'));
+        
+        // Check for errors first
+        const searchError = searchParams.get('error');
+        const hashError = hashParams.get('error');
+        if ((searchError || hashError) && !searchParams.get('code') && !hashParams.get('code')) {
+          const errorDescription = 
+            searchParams.get('error_description') || 
+            hashParams.get('error_description') || 
+            'Unknown error';
+            
           if (errorDescription.toLowerCase().includes('invalid') || errorDescription.toLowerCase().includes('expired')) {
             throw new Error("Lien de connexion invalide ou expiré. Veuillez demander un nouveau lien.");
           }
           throw new Error(`Auth redirect error: ${errorDescription}`);
         }
-
-        // Get current session
-        const { data: initialSessionData, error: sessionError } = await supabase.auth.getSession();
-
-        if (sessionError) {
-          console.error("Session error:", sessionError);
-          throw sessionError;
+        
+        // Try to get code from URL search params or hash fragment
+        let code = searchParams.get('code') || hashParams.get('code');
+        
+        if (!code) {
+          // Special handling for deep linking on mobile or unusual browser configurations
+          // Look for code in any part of the URL as a last resort
+          const fullUrl = window.location.href;
+          const codeMatch = fullUrl.match(/code=([^&]+)/);
+          if (codeMatch && codeMatch[1]) {
+            code = codeMatch[1];
+            console.log("Found code in URL match:", code.substring(0, 5) + "...");
+          }
         }
-
-        // Check if we already have a valid session
-        if (initialSessionData.session) {
-          console.log("Active session found, proceeding to dashboard");
-          toast({
-            title: "Connexion réussie",
-            description: "Vous êtes maintenant connecté.",
-          });
-          router.push("/dashboard");
-          return;
-        }
-
-        console.log("No active session found, checking for auth code...");
-
-        // Try to exchange auth code if present in URL
-        const code = searchParams.get('code');
+        
         if (!code) {
           console.error("No auth code found in URL");
-          setDebugInfo(`URL: ${window.location.href}, Params: ${JSON.stringify(Object.fromEntries(searchParams))}`);
+          const authConfigResult = await checkAuthConfig();
+          setDebugInfo(`URL: ${window.location.href}\nSearch: ${window.location.search}\nHash: ${window.location.hash}\nAuth Config: ${JSON.stringify(authConfigResult, null, 2)}`);
           throw new Error("Aucun code d'authentification trouvé dans l'URL. Veuillez réessayer de vous connecter.");
         }
-
+        
+        console.log("Found auth code, exchanging for session...");
+        
         // Explicitly exchange the auth code for a session
-        console.log("Exchanging auth code for session...");
         const { data: exchangeData, error: exchangeError } =
           await supabase.auth.exchangeCodeForSession(code);
 
@@ -155,7 +160,12 @@ export default function AuthCallbackPage() {
       }
     }
 
-    handleAuthCallback()
+    // Add a slight delay to ensure the URL is fully available
+    const timer = setTimeout(() => {
+      handleAuthCallback()
+    }, 500);
+    
+    return () => clearTimeout(timer);
   }, [router, toast])
 
   return (
