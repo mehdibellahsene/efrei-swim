@@ -7,45 +7,43 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
-import { useAuth } from "@/components/supabase-auth-provider"
 import Link from "next/link"
-import { Loader2 } from "lucide-react"
+import { Loader2, Mail } from "lucide-react"
+import { supabase } from "@/lib/supabase"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
-  const { signIn } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
     try {
-      const { error } = await signIn(email, password)
+      // Send magic link instead of password login
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        }
+      });
       
       if (error) {
-        toast({
-          title: "Erreur",
-          description: error,
-          variant: "destructive",
-        })
-        return
+        throw error;
       }
       
       toast({
-        title: "Connexion réussie",
-        description: "Vous êtes maintenant connecté.",
+        title: "Lien de connexion envoyé",
+        description: "Vérifiez votre boîte mail pour vous connecter.",
       })
       
-      // Redirect to dashboard
-      router.push('/dashboard')
+      // No immediate redirect, user needs to click the email link
     } catch (error: any) {
       toast({
         title: "Erreur",
-        description: error.message || "Une erreur est survenue lors de la connexion",
+        description: error.message || "Une erreur est survenue lors de l'envoi du lien",
         variant: "destructive",
       })
     } finally {
@@ -57,9 +55,14 @@ export default function LoginPage() {
     <div className="flex items-center justify-center min-h-screen bg-muted/40 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
+          <div className="flex justify-center mb-4">
+            <span className="flex items-center gap-2 font-bold text-xl">
+              <span className="text-blue-600">EFREI</span> Swim
+            </span>
+          </div>
           <CardTitle className="text-2xl">Connexion</CardTitle>
           <CardDescription>
-            Entrez votre email et mot de passe pour vous connecter
+            Recevez un lien de connexion par email
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -69,26 +72,14 @@ export default function LoginPage() {
               <Input 
                 id="email" 
                 type="email" 
-                placeholder="email@example.com" 
+                placeholder="vous@efrei.net" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Mot de passe</Label>
-                <Link href="/auth/reset-password" className="text-xs text-primary hover:underline">
-                  Mot de passe oublié ?
-                </Link>
-              </div>
-              <Input 
-                id="password" 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+              <p className="text-xs text-muted-foreground">
+                Nous vous enverrons un lien de connexion sécurisé
+              </p>
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-2">
@@ -96,10 +87,13 @@ export default function LoginPage() {
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Connexion...
+                  Envoi du lien...
                 </>
               ) : (
-                "Se connecter"
+                <>
+                  <Mail className="mr-2 h-4 w-4" />
+                  Recevoir un lien de connexion
+                </>
               )}
             </Button>
             <div className="text-center text-sm mt-2">
