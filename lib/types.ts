@@ -73,19 +73,23 @@ export interface Purchase {
 }
 
 export interface Article {
-  id: string
-  title: string
-  content: string
-  cover_image?: string | null
-  created_at: string
-  author: {
-    id: string
-    name: string
-    avatar?: string
-    role: Role
-  }
-  likes: number
-  comments_count: number
+  id: string;
+  title: string;
+  content: string;
+  image_url?: string; // Added for compatibility
+  cover_image?: string;
+  created_at: string;
+  author_id?: string;
+  author_name?: string;
+  author_avatar?: string;
+  likes?: number;
+  comments_count?: number;
+  author?: {
+    id: string;
+    name: string;
+    avatar: string;
+    role: string;
+  };
 }
 
 export interface Comment {

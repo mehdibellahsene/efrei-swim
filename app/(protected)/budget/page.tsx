@@ -16,12 +16,22 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
-import { DollarSign, Plus } from "lucide-react"
+import { DollarSign, Plus, Trash2 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useRole } from "@/components/role-provider"
-import { createPurchase, getAllPurchases } from "@/lib/supabase-api"
+import { createPurchase, getAllPurchases, deletePurchase } from "@/lib/supabase-api"
 import type { Purchase } from "@/lib/types"
 
 export default function BudgetPage() {
@@ -31,6 +41,8 @@ export default function BudgetPage() {
   const [purchases, setPurchases] = useState<Purchase[]>([])
   const [selectedCategory, setSelectedCategory] = useState("autre")
   const [isLoading, setIsLoading] = useState(true)
+  const [purchaseToDelete, setPurchaseToDelete] = useState<string | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   // Fetch purchases when component loads
   useEffect(() => {
@@ -94,6 +106,41 @@ export default function BudgetPage() {
       })
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // Handle delete purchase confirmation
+  const confirmDeletePurchase = (id: string) => {
+    setPurchaseToDelete(id)
+    setDeleteDialogOpen(true)
+  }
+
+  // Handle actual purchase deletion
+  const handleDeletePurchase = async () => {
+    if (!purchaseToDelete) return
+
+    try {
+      const success = await deletePurchase(purchaseToDelete)
+      if (success) {
+        toast({
+          title: "Dépense supprimée",
+          description: "La dépense a été supprimée avec succès.",
+        })
+        // Refresh purchases
+        fetchPurchases()
+      } else {
+        throw new Error("Impossible de supprimer la dépense.")
+      }
+    } catch (error) {
+      console.error("Error deleting purchase:", error)
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de supprimer la dépense.",
+        variant: "destructive",
+      })
+    } finally {
+      setPurchaseToDelete(null)
+      setDeleteDialogOpen(false)
     }
   }
 
@@ -227,6 +274,7 @@ export default function BudgetPage() {
                 <TableHead>Catégorie</TableHead>
                 <TableHead>Carte associée</TableHead>
                 <TableHead className="text-right">Montant</TableHead>
+                <TableHead className="w-[80px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -237,12 +285,39 @@ export default function BudgetPage() {
                   <TableCell>{purchase.category}</TableCell>
                   <TableCell>{purchase.relatedCardId ? `CARD-00${purchase.relatedCardId}` : "-"}</TableCell>
                   <TableCell className="text-right">{purchase.amount.toFixed(2)} €</TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => confirmDeletePurchase(purchase.id)}
+                      className="h-8 w-8"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span className="sr-only">Supprimer</span>
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+
+      {/* Confirmation dialog for purchase deletion */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer cette dépense ? Cette action ne peut pas être annulée.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeletePurchase}>Supprimer</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

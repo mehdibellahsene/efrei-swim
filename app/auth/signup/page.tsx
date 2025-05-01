@@ -7,17 +7,22 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { Loader2 } from "lucide-react"
 
 export default function SignupPage() {
   const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [fullName, setFullName] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!email.trim() || !fullName.trim()) {
+    if (!email.trim() || !fullName.trim() || !password.trim()) {
       toast({
         title: "Champs requis",
         description: "Veuillez remplir tous les champs.",
@@ -35,14 +40,23 @@ export default function SignupPage() {
       return
     }
 
+    if (password.length < 6) {
+      toast({
+        title: "Erreur",
+        description: "Le mot de passe doit contenir au moins 6 caractères.",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsLoading(true)
 
     try {
-      // Sign up with magic link (no password)
-      const { error } = await supabase.auth.signInWithOtp({
+      // Sign up with email and password
+      const { error } = await supabase.auth.signUp({
         email,
+        password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
             full_name: fullName
           }
@@ -57,6 +71,10 @@ export default function SignupPage() {
         title: "Inscription réussie",
         description: "Vérifiez votre boîte mail pour confirmer votre inscription.",
       })
+      
+      // Optionally redirect to login page
+      router.push("/auth/login")
+      
     } catch (error: any) {
       toast({
         title: "Erreur",
@@ -106,20 +124,42 @@ export default function SignupPage() {
                 required
               />
               <p className="text-xs text-muted-foreground">
-                Vous recevrez un lien de connexion sur cette adresse email
+                Utilisez votre email EFREI
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Mot de passe</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+              />
+              <p className="text-xs text-muted-foreground">
+                Au moins 6 caractères
               </p>
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Création en cours..." : "Créer un compte"}
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Création en cours...
+                </>
+              ) : (
+                "Créer un compte"
+              )}
             </Button>
           </form>
         </CardContent>
         <CardFooter className="flex flex-col space-y-2">
           <div className="text-sm text-muted-foreground text-center">
             Déjà un compte ?{" "}
-            <a href="/auth/login" className="text-blue-600 hover:underline">
+            <Link href="/auth/login" className="text-blue-600 hover:underline">
               Connectez-vous
-            </a>
+            </Link>
           </div>
         </CardFooter>
       </Card>

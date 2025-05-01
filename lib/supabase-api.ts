@@ -634,6 +634,21 @@ export async function getAllPurchases(): Promise<Purchase[]> {
   }
 }
 
+export async function deletePurchase(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('purchases')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting purchase:', error);
+    return false;
+  }
+}
+
 // Article/Forum Functions
 export async function createArticle(
   title: string, 
@@ -661,7 +676,7 @@ export async function createArticle(
   }
 }
 
-export async function getAllArticles(limit = 100): Promise<Article[]> {
+export async function getAllArticles(limit: number = 10): Promise<Article[]> {
   try {
     const { data, error } = await supabase
       .from('articles')
@@ -679,23 +694,44 @@ export async function getAllArticles(limit = 100): Promise<Article[]> {
       id: item.id,
       title: item.title,
       content: item.content,
-      cover_image: item.cover_image,
+      image_url: processArticleImageUrl(item.cover_image), // Map cover_image to image_url and process it
+      cover_image: item.cover_image, // Keep original field for compatibility
       created_at: item.created_at,
-      author: {
-        id: item.profiles.id,
-        name: item.profiles.full_name,
-        avatar: item.profiles.avatar_url,
-        role: item.profiles.role
-      },
+      author_id: item.author_id,
+      author_name: item.profiles.full_name,
+      author_avatar: item.profiles.avatar_url,
       likes: item.likes,
       comments_count: item.comments_count
     }));
 
     return articles;
   } catch (error) {
-    console.error('Error fetching articles:', error);
+    console.error("Error fetching articles:", error);
     return [];
   }
+}
+
+// Helper function to ensure image URLs are absolute
+function processArticleImageUrl(url: string | null): string {
+  if (!url) return '/placeholder.svg';
+  
+  // If it's already an absolute URL, return it
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  
+  // If it's a Supabase Storage URL, make it absolute
+  if (url.startsWith('storage/')) {
+    return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${url.substring(8)}`;
+  }
+  
+  // If it starts with a slash, it's a local URL
+  if (url.startsWith('/')) {
+    return url;
+  }
+  
+  // Otherwise, assume it's a relative URL and add leading slash
+  return `/${url}`;
 }
 
 export async function getArticle(id: string): Promise<Article | null> {

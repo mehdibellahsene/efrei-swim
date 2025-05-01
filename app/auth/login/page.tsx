@@ -8,11 +8,12 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Loader2, Mail } from "lucide-react"
+import { Loader2, LogIn } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
@@ -22,18 +23,10 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
-      // Ensure we have the full origin for the redirect URL
-      const origin = typeof window !== 'undefined' ? window.location.origin : '';
-      const redirectTo = `${origin}/auth/callback`;
-      
-      console.log("Sending magic link with redirect to:", redirectTo);
-      
-      // Send magic link with explicit redirect
-      const { error } = await supabase.auth.signInWithOtp({
+      // Sign in with email and password
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        options: {
-          emailRedirectTo: redirectTo,
-        }
+        password
       });
       
       if (error) {
@@ -41,15 +34,20 @@ export default function LoginPage() {
       }
       
       toast({
-        title: "Lien de connexion envoyé",
-        description: "Vérifiez votre boîte mail pour vous connecter.",
+        title: "Connexion réussie",
+        description: "Vous êtes maintenant connecté.",
       })
       
-      // No immediate redirect, user needs to click the email link
+      // Redirect based on user role
+      if (data.user?.user_metadata?.role === 'admin' || data.user?.email?.includes('@admin')) {
+        router.push("/admin/dashboard");
+      } else {
+        router.push("/dashboard");
+      }
     } catch (error: any) {
       toast({
         title: "Erreur",
-        description: error.message || "Une erreur est survenue lors de l'envoi du lien",
+        description: error.message || "Une erreur est survenue lors de la connexion",
         variant: "destructive",
       })
     } finally {
@@ -68,7 +66,7 @@ export default function LoginPage() {
           </div>
           <CardTitle className="text-2xl">Connexion</CardTitle>
           <CardDescription>
-            Recevez un lien de connexion par email
+            Connectez-vous à votre compte
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -83,9 +81,22 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
-              <p className="text-xs text-muted-foreground">
-                Nous vous enverrons un lien de connexion sécurisé
-              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Mot de passe</Label>
+              <Input 
+                id="password" 
+                type="password" 
+                placeholder="••••••••" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            <div className="flex justify-end">
+              <Link href="/auth/reset-password" className="text-sm text-blue-600 hover:underline">
+                Mot de passe oublié?
+              </Link>
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-2">
@@ -93,12 +104,12 @@ export default function LoginPage() {
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Envoi du lien...
+                  Connexion en cours...
                 </>
               ) : (
                 <>
-                  <Mail className="mr-2 h-4 w-4" />
-                  Recevoir un lien de connexion
+                  <LogIn className="mr-2 h-4 w-4" />
+                  Se connecter
                 </>
               )}
             </Button>

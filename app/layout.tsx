@@ -24,33 +24,7 @@ export default function RootLayout({
   return (
     <html lang="fr" suppressHydrationWarning>
       <head>
-        {/* Theme script to prevent flash */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  const getTheme = () => {
-                    const storedTheme = localStorage.getItem('theme');
-                    if (storedTheme) return storedTheme;
-                    
-                    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                      return 'dark';
-                    }
-                    return 'light';
-                  }
-
-                  const theme = getTheme();
-                  document.documentElement.classList.toggle('dark', theme === 'dark');
-                  document.documentElement.style.colorScheme = theme;
-                } catch (e) {
-                  // Fallback if localStorage is not available
-                  console.error(e);
-                }
-              })();
-            `,
-          }}
-        />
+        {/* Remove the theme script - your ThemeProvider will handle this */}
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
         <AuthProvider>
