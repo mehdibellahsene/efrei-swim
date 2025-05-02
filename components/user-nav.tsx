@@ -54,7 +54,7 @@ export function UserNav() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Avatar className="h-8 w-8 cursor-pointer">
-          <AvatarImage src={user?.user_metadata?.avatar_url || "/placeholder.svg"} alt={userName} />
+          <AvatarImage src={user?.user_metadata?.avatar_url || "/profile.png"} alt={userName} />
           <AvatarFallback>{userName.charAt(0)}</AvatarFallback>
         </Avatar>
       </DropdownMenuTrigger>

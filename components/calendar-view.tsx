@@ -122,6 +122,12 @@ export function CalendarView({ events }: CalendarViewProps) {
                     } else if (event.type === "sortie") {
                       bgColor = "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
                     }
+                    
+                    // Add opacity for past events
+                    const isPastEvent = new Date(event.date) < new Date()
+                    if (isPastEvent) {
+                      bgColor += " opacity-60"
+                    }
 
                     return (
                       <div

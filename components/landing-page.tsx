@@ -165,7 +165,7 @@ export function LandingPage() {
                   Plongez dans l'aventure<br/> EFREI Swim Team
                 </h1>
                 <p className="max-w-[700px] text-lg text-muted-foreground">
-                  Gérez vos séances d'entraînement, suivez votre progression, et rejoignez la communauté des nageurs de l'EFREI.
+                  Suivez votre progression, et rejoignez la communauté des nageurs de l'EFREI.
                 </p>
                 {/* Hidden admin link with keyboard shortcut - only visible in source code */}
                 <div id="admin-access" className="hidden">
@@ -222,7 +222,7 @@ export function LandingPage() {
                 className="relative md:flex-1 flex justify-center"
               >
                 <div className="relative w-full max-w-[400px] aspect-video bg-blue-600/10 rounded-2xl overflow-hidden shadow-xl">
-                  <div className="absolute inset-0 bg-[url('/swimming-hero.jpg')] bg-cover bg-center opacity-85"></div>
+                  <div className="absolute inset-0 bg-[url('https://washcollsports.com/images/2022/7/18/casey1.jpg')] bg-cover bg-center opacity-85"></div>
                   <div className="absolute inset-0 bg-gradient-to-t from-blue-900/60 to-transparent"></div>
                   <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
                     <p className="font-medium">Entraînements réguliers</p>

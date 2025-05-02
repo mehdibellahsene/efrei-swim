@@ -6,7 +6,7 @@ import { MainNav } from "@/components/main-nav"
 import { UserNav } from "@/components/user-nav"
 import { useRole } from "@/components/role-provider"
 import { useRouter, usePathname } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { ModeToggle } from "@/components/mode-toggle"
 import Link from "next/link"
 import { useAuth } from "@/components/auth-provider"
@@ -18,18 +18,39 @@ export default function ProtectedLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { role } = useRole()
+  const { role, setRole } = useRole()
   const router = useRouter()
   const pathname = usePathname()
   const { user } = useAuth()
   const { toast } = useToast()
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Redirect to login if not authenticated
+  // Check authentication status and update role
   useEffect(() => {
-    if (role === "visiteur") {
-      router.push("/auth/login")
-      return
+    const checkAuth = async () => {
+      setIsLoading(true)
+      
+      // Get the current session from Supabase
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (session) {
+        // User is authenticated, update role based on user metadata
+        const userRole = session.user.user_metadata?.role || 'athlete'
+        setRole(userRole)
+      } else if (!isLoading) {
+        // Only redirect if not the initial load
+        router.push("/auth/login")
+      }
+      
+      setIsLoading(false)
     }
+    
+    checkAuth()
+  }, [router, setRole])
+
+  // Handle access control for protected routes
+  useEffect(() => {
+    if (isLoading) return // Skip checks while loading
 
     // Redirect from admin page if not admin
     if (pathname.includes("/admin") && role !== "admin") {
@@ -46,9 +67,20 @@ export default function ProtectedLayout({
     if (pathname.startsWith("/cards") && role !== "membre" && role !== "admin") {
       router.push("/dashboard")
     }
-  }, [role, router, pathname, toast])
+  }, [role, router, pathname, toast, isLoading])
 
-  if (role === "visiteur") {
+  // Show loading state or nothing while checking authentication
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p className="text-muted-foreground">Chargement...</p>
+      </div>
+    )
+  }
+
+  // If still visitor role after auth check completed, redirect to login
+  if (role === "visiteur" && !isLoading) {
+    router.push("/auth/login")
     return null
   }
 

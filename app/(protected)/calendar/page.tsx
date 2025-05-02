@@ -38,7 +38,7 @@ export default function CalendarPage() {
     async function fetchEvents() {
       try {
         setLoading(true)
-        const data = await getUpcomingEvents(100)
+        const data = await getUpcomingEvents(100, false) // Pass false to get all events
         setEvents(data || [])
       } catch (error) {
         console.error("Error fetching events:", error)

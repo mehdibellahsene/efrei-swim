@@ -297,17 +297,25 @@ export async function createEvent(
   }
 }
 
-export async function getUpcomingEvents(limit = 10): Promise<Event[]> {
+export async function getUpcomingEvents(limit = 10, upcomingOnly = true): Promise<Event[]> {
   try {
     const today = new Date().toISOString();
     
-    // Get the events
-    const { data: events, error } = await supabase
+    // Build the query
+    let query = supabase
       .from('events')
-      .select('*, profiles:created_by(*)')
-      .gte('event_date', today)
-      .order('event_date', { ascending: true })
-      .limit(limit);
+      .select('*, profiles:created_by(*)');
+    
+    // Only filter by date if upcomingOnly is true
+    if (upcomingOnly) {
+      query = query.gte('event_date', today);
+    }
+    
+    // Add order and limit
+    query = query.order('event_date', { ascending: true }).limit(limit);
+    
+    // Execute the query
+    const { data: events, error } = await query;
     
     if (error) throw error;
     
@@ -466,6 +474,16 @@ export async function createCard(
       .single();
     
     if (error) throw error;
+
+    // Create a corresponding purchase in the budget
+    await createPurchase({
+      label: `Achat de carte ${cardId}`,
+      amount: purchasePrice,
+      date: new Date().toISOString(),
+      category: "Entrées piscine",
+      notes: notes || "",
+    });
+
     return data;
   } catch (error) {
     console.error('Error creating card:', error);

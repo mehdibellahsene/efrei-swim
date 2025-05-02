@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast"
 import { getAllUsers, updateUserRole, syncUserProfiles } from "@/lib/supabase-api"
 import { seedInitialData } from "@/lib/seed-data"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import type { Profile } from "@/lib/types"
+import type { Profile, Role } from "@/lib/types"
 
 export default function AdminPage() {
   const { toast } = useToast()
@@ -19,6 +19,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [isSeedingData, setIsSeedingData] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
+  const [updatingRoles, setUpdatingRoles] = useState<{[key: string]: boolean}>({})
 
   useEffect(() => {
     fetchUsers()
@@ -89,32 +90,70 @@ export default function AdminPage() {
     }
   }
 
+  // Helper function to identify system admin users that shouldn't be modified
+  const isSystemAdmin = (user: Profile) => {
+    // Check if the user email contains "admin" or the role is admin and username is "Admin"
+    return (user.email?.toLowerCase().includes("admin") || 
+           (user.role === "admin" && user.name === "Admin"))
+  }
+
+  const handleRoleChange = async (userId: string, newRole: Role) => {
+    // Get the user to check if they are a system admin
+    const user = users.find(u => u.id === userId)
+    
+    // Prevent changing system admin roles
+    if (user && isSystemAdmin(user)) {
+      toast({
+        title: "Action non autorisée",
+        description: "Le rôle d'un administrateur système ne peut pas être modifié.",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    // Set loading state for this specific user
+    setUpdatingRoles(prev => ({ ...prev, [userId]: true }))
+    
+    try {
+      const success = await updateUserRole(userId, newRole)
+      
+      if (success) {
+        // Update user in local state to show the change immediately
+        setUsers(users.map(user => 
+          user.id === userId ? { ...user, role: newRole } : user
+        ))
+        
+        toast({
+          title: "Rôle mis à jour",
+          description: `Le rôle de l'utilisateur a été modifié avec succès.`,
+        })
+      } else {
+        throw new Error("La mise à jour du rôle a échoué")
+      }
+    } catch (error) {
+      console.error("Error updating role:", error)
+      toast({
+        title: "Erreur",
+        description: "Impossible de modifier le rôle de l'utilisateur.",
+        variant: "destructive",
+      })
+    } finally {
+      setUpdatingRoles(prev => ({ ...prev, [userId]: false }))
+    }
+  }
+
   return (
     <div className="container py-8">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-3xl font-bold">Administration</h1>
         <div className="space-x-2">
-          <Button 
-            onClick={handleSyncProfiles} 
-            disabled={isSyncing} 
-            variant="outline"
-          >
-            {isSyncing ? "Synchronisation..." : "Synchroniser les profils"}
-          </Button>
-          <Button 
-            onClick={handleSeedData} 
-            disabled={isSeedingData}
-            variant="secondary"
-          >
-            {isSeedingData ? "Initialisation..." : "Initialiser les données"}
-          </Button>
+          
         </div>
       </div>
 
       <Tabs defaultValue="users" className="mt-6">
         <TabsList>
           <TabsTrigger value="users">Utilisateurs</TabsTrigger>
-          <TabsTrigger value="logs">Journaux d'activité</TabsTrigger>
         </TabsList>
         <TabsContent value="users" className="mt-6">
           <Card>
@@ -139,9 +178,23 @@ export default function AdminPage() {
                       <TableCell>{user.email}</TableCell>
                       <TableCell>{user.role}</TableCell>
                       <TableCell className="text-right">
-                        <Button variant="outline" onClick={() => updateUserRole(user.id, "admin")}>
-                          Promouvoir
-                        </Button>
+                        <div className="flex justify-end">
+                          <Select
+                            defaultValue={user.role}
+                            onValueChange={(value) => handleRoleChange(user.id, value as Role)}
+                            disabled={updatingRoles[user.id] || isSystemAdmin(user)}
+                          >
+                            <SelectTrigger className="w-[140px]">
+                              <SelectValue placeholder={isSystemAdmin(user) ? "Admin système" : "Sélectionner un rôle"} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="visiteur">Visiteur</SelectItem>
+                              <SelectItem value="athlete">Athlète</SelectItem>
+                              <SelectItem value="membre">Membre</SelectItem>
+                              <SelectItem value="admin">Administrateur</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

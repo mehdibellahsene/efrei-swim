@@ -182,11 +182,23 @@ export function EventDetailModal({ event, isOpen, onClose }: EventDetailModalPro
                   </h3>
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
-                      <Checkbox id="absence" checked={isAbsent} onCheckedChange={(checked) => setIsAbsent(!!checked)} />
-                      <Label htmlFor="absence">Je ne pourrai pas être présent</Label>
+                      <Checkbox
+                        id="absence"
+                        checked={isAbsent}
+                        onCheckedChange={(checked) => setIsAbsent(!!checked)}
+                        disabled={new Date(event.date) < new Date()}
+                      />
+                      <Label
+                        htmlFor="absence"
+                        className={new Date(event.date) < new Date() ? "text-muted-foreground" : ""}
+                      >
+                        {new Date(event.date) < new Date()
+                          ? "Événement passé - Impossible de modifier"
+                          : "Je ne pourrai pas être présent"}
+                      </Label>
                     </div>
 
-                    {isAbsent && (
+                    {isAbsent && new Date(event.date) >= new Date() && (
                       <div className="space-y-2 mt-2">
                         <Label htmlFor="absence-reason">Raison de l'absence</Label>
                         <Select value={absenceReason} onValueChange={setAbsenceReason}>
@@ -314,9 +326,6 @@ export function EventDetailModal({ event, isOpen, onClose }: EventDetailModalPro
                   {role === "admin" && (
                     <div className="space-y-2">
                       <Button variant="outline" size="sm" className="w-full">
-                        Modifier l'événement
-                      </Button>
-                      <Button variant="outline" size="sm" className="w-full">
                         Envoyer un rappel aux participants
                       </Button>
                       <Button variant="destructive" size="sm" className="w-full">
@@ -341,13 +350,15 @@ export function EventDetailModal({ event, isOpen, onClose }: EventDetailModalPro
         </Tabs>
 
         <DialogFooter className="flex justify-between items-center gap-2">
-          {isRegistered ? (
-            <Button variant="outline" onClick={handleUnregister}>
-              Se désinscrire
-            </Button>
-          ) : (
-            <Button onClick={handleRegister}>S'inscrire</Button>
-          )}
+          {new Date(event.date) >= new Date() ? (
+            isRegistered ? (
+              <Button variant="outline" onClick={handleUnregister}>
+                Se désinscrire
+              </Button>
+            ) : (
+              <Button onClick={handleRegister}>S'inscrire</Button>
+            )
+          ) : null}
           <Button variant="ghost" onClick={onClose}>
             Fermer
           </Button>

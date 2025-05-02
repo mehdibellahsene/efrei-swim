@@ -50,7 +50,7 @@ export function UserAvatarMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Avatar className="h-8 w-8 cursor-pointer">
-          <AvatarImage src={user.user_metadata?.avatar_url || "/placeholder.svg"} alt={user.user_metadata?.full_name || "Utilisateur"} />
+          <AvatarImage src={user.user_metadata?.avatar_url || "/profile.png"} alt={user.user_metadata?.full_name || "Utilisateur"} />
           <AvatarFallback>
             {user.user_metadata?.full_name ? user.user_metadata.full_name.charAt(0) : "U"}
           </AvatarFallback>

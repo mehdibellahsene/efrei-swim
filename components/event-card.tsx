@@ -172,17 +172,19 @@ export function EventCard({ event, onUpdate }: EventCardProps) {
                 variant="outline" 
                 className="w-full" 
                 onClick={handleUnregister}
-                disabled={isLoading}
+                disabled={isLoading || new Date(event.date) < new Date()}
               >
-                {isLoading ? "Chargement..." : "Se désinscrire"}
+                {isLoading ? "Chargement..." : 
+                 new Date(event.date) < new Date() ? "Événement passé" : "Se désinscrire"}
               </Button>
             ) : (
               <Button 
                 className="w-full" 
                 onClick={handleRegister}
-                disabled={isLoading}
+                disabled={isLoading || new Date(event.date) < new Date()}
               >
-                {isLoading ? "Chargement..." : "S'inscrire"}
+                {isLoading ? "Chargement..." : 
+                 new Date(event.date) < new Date() ? "Événement passé" : "S'inscrire"}
               </Button>
             ))}
         </CardFooter>

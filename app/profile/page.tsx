@@ -85,7 +85,7 @@ export default function ProfilePage() {
             <Card className="md:row-span-2">
               <CardContent className="pt-6 flex flex-col items-center">
                 <Avatar className="h-24 w-24">
-                  <AvatarImage src={userData.avatarUrl || "/placeholder.svg"} alt={userData.fullName} />
+                  <AvatarImage src={userData.avatarUrl || "/profile.png"} alt={userData.fullName} />
                   <AvatarFallback>
                     <User className="h-12 w-12 text-muted-foreground" />
                   </AvatarFallback>
@@ -124,7 +124,6 @@ export default function ProfilePage() {
             <Tabs defaultValue="informations" className="w-full">
               <TabsList>
                 <TabsTrigger value="informations">Informations personnelles</TabsTrigger>
-                <TabsTrigger value="preferences">Préférences</TabsTrigger>
               </TabsList>
               
               <TabsContent value="informations">
