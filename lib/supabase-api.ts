@@ -789,36 +789,53 @@ export async function getArticle(id: string): Promise<Article | null> {
 
 export async function addComment(articleId: string, content: string): Promise<Comment | null> {
   try {
+    // Basic validation
+    if (!articleId || !content.trim()) {
+      throw new Error('Article ID and content are required');
+    }
+
     // Get the current user
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError) throw authError;
     if (!user) throw new Error('User not authenticated');
 
-    const commentId = generateId();
-    const newComment = {
-      id: commentId,
-      content,
-      article_id: articleId,
-      author_id: user.id
-    };
-    
-    const { error } = await supabase
-      .from('comments')
-      .insert([newComment]);
+    // Use the RPC function to create comment (this will also update comment count)
+    const { data, error } = await supabase
+      .rpc('create_comment', {
+        article_id: articleId,
+        content: content
+      });
     
     if (error) throw error;
+    
+    if (!data) {
+      throw new Error('No data returned from comment creation');
+    }
 
-    // Update comment count for the article
-    await supabase.rpc('increment_comment_count', { article_id: articleId });
+    // Get the author profile information
+    const { data: authorData, error: profileError } = await supabase
+      .from('profiles')
+      .select('full_name, avatar_url, role')
+      .eq('id', user.id)
+      .single();
+      
+    if (profileError) {
+      console.warn('Could not fetch author profile:', profileError);
+    }
 
+    // Return the comment with author information
     return {
-      id: commentId,
-      content,
-      article_id: articleId,
-      author_id: user.id,
-      created_at: new Date().toISOString()
+      id: data.id,
+      content: data.content,
+      article_id: data.article_id,
+      author_id: data.author_id,
+      created_at: data.created_at,
+      author_name: authorData?.full_name || 'Unknown User',
+      author_avatar: authorData?.avatar_url || null,
+      author_role: authorData?.role || 'visiteur'
     };
   } catch (error) {
     console.error('Error adding comment:', error);
-    return null;
+    throw error; // Re-throw the error so the caller can handle it
   }
 }

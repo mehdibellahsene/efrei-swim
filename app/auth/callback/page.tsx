@@ -159,8 +159,6 @@ export default function AuthCallbackPage() {
         setIsLoading(false)
       }
     }
-
-    // Add a slight delay to ensure the URL is fully available
     const timer = setTimeout(() => {
       handleAuthCallback()
     }, 500);

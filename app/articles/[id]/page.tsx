@@ -6,10 +6,12 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ArrowLeft, Calendar } from "lucide-react"
 import { useEffect, useState } from "react"
-import { getArticle } from "@/lib/supabase-api"
-import type { Article } from "@/lib/types"
+import { getArticle, addComment } from "@/lib/supabase-api"
+import type { Article, Comment } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import Image from "next/image"
+import { supabase } from "@/lib/supabase-client"
+import { Textarea } from "@/components/ui/textarea"
 
 export default function PublicArticlePage() {
   const params = useParams()
@@ -17,6 +19,9 @@ export default function PublicArticlePage() {
   const { toast } = useToast()
   const [article, setArticle] = useState<Article | null>(null)
   const [loading, setLoading] = useState(true)
+  const [comments, setComments] = useState<Comment[]>([])
+  const [newComment, setNewComment] = useState("")
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false)
 
   const articleId = params.id as string
 
@@ -40,6 +45,78 @@ export default function PublicArticlePage() {
 
     fetchArticle()
   }, [articleId, toast])
+
+  useEffect(() => {
+    async function fetchComments() {
+      try {
+        const { data, error } = await supabase
+          .from("comments")
+          .select(`
+            *,
+            profiles:author_id (
+              full_name,
+              avatar_url,
+              role
+            )
+          `)
+          .eq("article_id", articleId)
+          .order("created_at", { ascending: false })
+
+        if (error) throw error
+
+        const transformedComments = data.map(comment => ({
+          ...comment,
+          author_name: comment.profiles?.full_name || "Utilisateur inconnu",
+          author_avatar: comment.profiles?.avatar_url || null,
+          author_role: comment.profiles?.role || "visiteur"
+        }))
+
+        setComments(transformedComments)
+      } catch (error) {
+        console.error("Error fetching comments:", error)
+        toast({
+          title: "Erreur",
+          description: "Impossible de charger les commentaires.",
+          variant: "destructive",
+        })
+      }
+    }
+
+    if (articleId) {
+      fetchComments()
+    }
+  }, [articleId, toast])
+
+  const handleAddComment = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newComment.trim()) {
+      toast({
+        title: "Erreur",
+        description: "Le commentaire ne peut pas être vide.",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    try {
+      const comment = await addComment(articleId, newComment)
+      if (comment) {
+        setComments((prev) => [comment, ...prev])
+        setNewComment("")
+        toast({
+          title: "Commentaire ajouté",
+          description: "Votre commentaire a été publié avec succès.",
+        })
+      }
+    } catch (error: any) {
+      console.error("Error adding comment:", error)
+      toast({
+        title: "Erreur", 
+        description: error.message || "Impossible d'ajouter le commentaire. Veuillez réessayer.",
+        variant: "destructive",
+      })
+    }
+  }
 
   if (loading) {
     return (
@@ -113,7 +190,7 @@ export default function PublicArticlePage() {
           <div className="flex items-center gap-2 mb-6 pb-6 border-b">
             <Avatar>
               <AvatarImage
-                src={article.author?.avatar || article.author_avatar || "/placeholder.svg"}
+                src={article.author?.avatar || article.author_avatar || "/profile.png"}
                 alt={article.author?.name || article.author_name || ""}
               />
               <AvatarFallback>{(article.author?.name || article.author_name || "?").charAt(0)}</AvatarFallback>
@@ -131,6 +208,70 @@ export default function PublicArticlePage() {
           </div>
         </CardContent>
       </Card>
+
+      <section className="mt-8">
+        <h2 className="text-2xl font-bold mb-4">Commentaires ({comments.length})</h2>
+
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg">Ajouter un commentaire</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleAddComment} className="space-y-4">
+              <Textarea
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="Partagez votre avis..."
+                className="min-h-[100px]"
+                required
+              />
+              <div className="flex justify-end">
+                <Button type="submit" disabled={isSubmittingComment}>
+                  {isSubmittingComment ? "Publication..." : "Publier"}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        {comments.length > 0 ? (
+          <ul className="space-y-4">
+            {comments.map((comment) => (
+              <li key={comment.id} className="border rounded-lg p-4 bg-card">
+                <div className="flex items-center mb-3">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={comment.author_avatar || "/profile.png"} />
+                    <AvatarFallback>{(comment.author_name?.charAt(0) || "?").toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <div className="ml-2">
+                    <div className="font-medium text-sm">{comment.author_name}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
+                        {comment.author_role}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(comment.created_at).toLocaleDateString("fr-FR", {
+                          day: "numeric", 
+                          month: "short", 
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit"
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <p className="whitespace-pre-wrap text-sm">{comment.content}</p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="text-center py-8 text-muted-foreground">
+            Aucun commentaire pour le moment. Soyez le premier à commenter !
+          </div>
+        )}
+      </section>
     </div>
   )
 }
+

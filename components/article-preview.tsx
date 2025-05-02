@@ -59,8 +59,10 @@ export function ArticlePreview({ article }: { article: Article }) {
         <CardFooter className="p-4 pt-0 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Avatar className="h-6 w-6">
-              <AvatarImage src={article.author_avatar || "/placeholder.svg"} />
-              <AvatarFallback>{article.author_name?.charAt(0) || "U"}</AvatarFallback>
+              <AvatarImage src={article.author?.avatar_url || article.author_avatar || "/profile.png"} />
+              <AvatarFallback>
+                {(article.author?.name || article.author_name || "?").charAt(0)}
+              </AvatarFallback>
             </Avatar>
             <span className="text-xs text-muted-foreground">{article.author_name}</span>
           </div>
