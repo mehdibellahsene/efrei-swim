@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
-import { getAllCards, createCard } from "@/lib/supabase-api"
+import { getAllCards, createCard, deleteCard } from "@/lib/supabase-api"
 import { Edit, Plus, Trash } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -31,6 +31,7 @@ export default function CardsPage() {
   const [open, setOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [selectedCard, setSelectedCard] = useState<string | null>(null)
+  const [selectedCardData, setSelectedCardData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [cards, setCards] = useState<any[]>([])
   const [isLoadingCards, setIsLoadingCards] = useState(true)
@@ -87,20 +88,60 @@ export default function CardsPage() {
     }
   }
 
-  const handleEditCard = (e: React.FormEvent) => {
+  const handleEditCard = async (e: React.FormEvent) => {
     e.preventDefault()
+    const form = e.target as HTMLFormElement
+    // Process form data and update card here
+    // This would need additional implementation to actually update the card
+    
     setEditOpen(false)
     toast({
       title: "Carte modifiée",
       description: "La carte a été modifiée avec succès.",
     })
+    fetchCards() // Refresh the list after edit
   }
 
-  const handleDeleteCard = (id: string) => {
-    toast({
-      title: "Carte supprimée",
-      description: "La carte a été supprimée avec succès.",
-    })
+  const handleDeleteCard = async (id: string) => {
+    try {
+      const success = await deleteCard(id)
+      if (success) {
+        toast({
+          title: "Carte supprimée",
+          description: "La carte a été supprimée avec succès.",
+        })
+        fetchCards() // Refresh the cards list after deletion
+      } else {
+        throw new Error("Deletion failed")
+      }
+    } catch (error) {
+      console.error("Error deleting card:", error)
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer la carte.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const openEditModal = async (cardId: string) => {
+    try {
+      const cardToEdit = cards.find(card => card.id === cardId)
+      if (cardToEdit) {
+        setSelectedCardData(cardToEdit)
+        setSelectedCard(cardId)
+        setEditOpen(true)
+      } else {
+        throw new Error("Card not found")
+      }
+    } catch (error) {
+      console.error("Error fetching card details:", error)
+      toast({
+        title: "Erreur",
+        description: "Impossible de récupérer les détails de la carte.",
+        variant: "destructive",
+      })
+    }
   }
 
   return (
@@ -162,26 +203,49 @@ export default function CardsPage() {
             <form onSubmit={handleEditCard} className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-cardId">Identifiant de la carte</Label>
-                <Input id="edit-cardId" defaultValue="CARD-001" required />
+                <Input 
+                  id="edit-cardId" 
+                  defaultValue={selectedCardData?.card_id || selectedCardData?.cardId || ""} 
+                  required 
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-totalEntries">Nombre total d'entrées</Label>
-                  <Input id="edit-totalEntries" type="number" min="1" defaultValue="10" required />
+                  <Input 
+                    id="edit-totalEntries" 
+                    type="number" 
+                    min="1" 
+                    defaultValue={selectedCardData?.total_entries || selectedCardData?.totalEntries || 10} 
+                    required 
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="edit-remainingEntries">Entrées restantes</Label>
-                  <Input id="edit-remainingEntries" type="number" min="0" defaultValue="7" required />
+                  <Input 
+                    id="edit-remainingEntries" 
+                    type="number" 
+                    min="0" 
+                    defaultValue={selectedCardData?.remaining_entries || selectedCardData?.remainingEntries || 0} 
+                    required 
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-purchasePrice">Prix d'achat (€)</Label>
-                  <Input id="edit-purchasePrice" type="number" min="0" step="0.01" defaultValue="45.00" required />
+                  <Input 
+                    id="edit-purchasePrice" 
+                    type="number" 
+                    min="0" 
+                    step="0.01" 
+                    defaultValue={selectedCardData?.purchase_price || selectedCardData?.purchasePrice || 45.00} 
+                    required 
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="edit-status">Statut</Label>
-                  <Select defaultValue="active">
+                  <Select defaultValue={selectedCardData?.status || "active"}>
                     <SelectTrigger id="edit-status">
                       <SelectValue placeholder="Statut de la carte" />
                     </SelectTrigger>
@@ -194,7 +258,11 @@ export default function CardsPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-notes">Notes</Label>
-                <Textarea id="edit-notes" defaultValue="Carte achetée le 01/03/2025" rows={3} />
+                <Textarea 
+                  id="edit-notes" 
+                  defaultValue={selectedCardData?.notes || ""} 
+                  rows={3} 
+                />
               </div>
               <DialogFooter>
                 <Button type="submit">Enregistrer les modifications</Button>
@@ -268,10 +336,7 @@ export default function CardsPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => {
-                                    setSelectedCard(card.id)
-                                    setEditOpen(true)
-                                  }}
+                                  onClick={() => openEditModal(card.id)}
                                 >
                                   <Edit className="h-4 w-4" />
                                   <span className="sr-only">Modifier</span>
@@ -348,10 +413,7 @@ export default function CardsPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => {
-                                  setSelectedCard(card.id)
-                                  setEditOpen(true)
-                                }}
+                                onClick={() => openEditModal(card.id)}
                               >
                                 <Edit className="h-4 w-4" />
                                 <span className="sr-only">Modifier</span>

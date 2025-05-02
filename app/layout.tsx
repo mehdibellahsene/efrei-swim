@@ -12,8 +12,12 @@ import { AdminKeyboardShortcut } from "@/components/admin-keyboard-shortcut"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Efrei Swim Club",
-  description: "Plateforme de gestion pour le club de natation de l'Efrei",
+  title: "Efrei Swim",
+  description: "Application de gestion de piscine",
+  icons: {
+    icon: "/logo.jpg",
+    apple: "/logo.jpg",
+  },
 }
 
 export default function RootLayout({
